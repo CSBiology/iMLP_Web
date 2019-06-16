@@ -1,0 +1,96 @@
+
+body {
+    font-family: "Lora",Times,serif;
+    overflow-y : auto;
+    background-image: url("/Images/CircuitBrain.jpg");
+    background-repeat: no-repeat;
+    background-size: 100%;
+    background-attachment: fixed;
+    background-position: center;
+
+}
+.navbar.is-dark.csbNav{
+    background-color: rgb(68,84,106);
+}
+
+.hero.csbHero{
+/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#ed7d31+0,faee05+100 */
+    background: #ed7d31;
+    background: -moz-linear-gradient(-55deg, #ed7d31 0%, #fad505 80%);
+    background: -webkit-linear-gradient(-55deg, #ed7d31 0%,#fad505 100%);
+    background: linear-gradient(145deg, rgba(237, 125, 49, 0.8) 0%,rgba(250, 238, 5, 0.8) 100%);
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ed7d31', endColorstr='#faee05',GradientType=1 );
+}
+
+.section.csbSection{
+    background-color : rgb(222, 235, 247);
+}
+
+.section.resultSection {
+    background-color: rgb(68,84,106);
+}
+
+.tile.csbTile {
+    border: 1px solid rgb(68,84,106);
+}
+
+.ResultFrame {
+    min-height: 600px;
+    min-width: 600px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.transparent {
+    background-color: rgb(0,0,0,0.0);
+}
+
+.wordBreak {
+    word-wrap: break-word;
+}
+
+.fastaDisplay span{
+    font-family: Consolas,monaco,monospace;
+    font-size: 1.25em;
+    line-height: 100%;
+    padding: 1px 0px 1px 1px;
+    font-weight: 1200;
+}
+
+a[download]{
+    font-size: 1.5em;
+    line-height: 100%;
+    background-color: #22c65b;
+    border-color: transparent;
+    color: #fff;
+    text-decoration: underline;
+}
+
+a[download]::before{
+    height: 1em;
+    position: relative;
+    top: 0.75em;
+    right: 0.5em;
+    width: 1em;
+}
+
+a[download]:hover,
+a[download]:focus{
+    text-decoration: none;
+}
+
+
+#prepareDownload{
+    font-size: 1.5em;
+    line-height: 100%;
+}
+
+.card-footer-item {
+    font-size: 1.5em;
+    line-height: 100%;
+}
+
+
+.is-selected-model {
+    border: 2px solid green;
+}

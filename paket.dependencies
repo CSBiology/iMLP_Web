@@ -1,0 +1,50 @@
+group Server
+    source https://api.nuget.org/v3/index.json
+    framework: netcoreapp2.2
+    storage: none
+
+    nuget FSharp.Core
+    nuget Suave 2.5.5
+    nuget Fable.Remoting.Suave ~> 3
+    nuget FSharp.Plotly
+
+    git https://github.com/CSBiology/FSharpAux.git nuget Packages: /
+
+    nuget FSharpAux
+    nuget FSharpAux.IO
+
+    git https://github.com/CSBiology/BioFSharp.git nuget Packages: /
+
+    nuget BioFSharp
+    nuget BioFSharp.IO
+    nuget BioFSharp.BioTools
+
+group Client
+    source https://api.nuget.org/v3/index.json
+    framework: netstandard2.0
+    storage: none
+
+    nuget Fable.Core ~> 3
+    nuget Fable.Browser.Blob
+    nuget Fable.Browser.Dom
+    nuget Fable.Browser.Event
+    nuget Fable.Browser.Performance
+    nuget Fable.Elmish ~> 3
+    nuget Fable.Elmish.Debugger ~> 3
+    nuget Fable.Elmish.HMR ~> 4
+    nuget Fable.Elmish.React ~> 3
+    nuget Fable.React ~> 5
+    nuget Fable.Remoting.Client ~> 5
+    nuget Fulma ~> 2
+    nuget Fable.FontAwesome.Free ~> 2
+
+group Build
+    source https://api.nuget.org/v3/index.json
+    framework: netstandard2.0
+    storage: none
+
+    nuget FSharp.Core
+    nuget Fake.Core.Target
+    nuget Fake.DotNet.Cli
+    nuget Fake.IO.FileSystem
+

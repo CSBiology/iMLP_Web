@@ -1,0 +1,13 @@
+group Client
+    FSharp.Core
+    Fable.Core
+    Fable.Browser.Blob
+    Fable.Browser.Dom
+    Fable.Browser.Event
+    Fable.Elmish.Debugger
+    Fable.Elmish.React
+    Fable.Elmish.HMR
+    Fable.Remoting.Client
+    Fulma
+    Fable.FontAwesome.Free
+

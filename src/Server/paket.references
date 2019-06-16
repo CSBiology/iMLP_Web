@@ -1,0 +1,10 @@
+group Server
+    FSharp.Core
+    Suave
+    Fable.Remoting.Suave
+    BioFSharp
+    BioFSharp.IO
+    BioFSharp.BioTools
+    FSharpAux
+    FSharpAux.IO
+    FSharp.Plotly
