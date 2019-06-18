@@ -24,7 +24,7 @@ type TargetPResult = {
 
 type ITargetPApi = {
     SingleSequenceRequest : TargetPModel -> string -> Async<TargetPResult>
-    FastaFileRequest : TargetPModel -> string -> Async<TargetPResult array>
+    //FastaFileRequest : TargetPModel -> string -> Async<TargetPResult array>
     DownloadRequestSingle: TargetPResult*System.Guid -> Async<unit>
     DownloadRequestMultiple: TargetPResult array * System.Guid -> Async<unit>
 }

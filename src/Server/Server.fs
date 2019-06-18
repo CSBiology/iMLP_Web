@@ -135,22 +135,20 @@ let targetPApi = {
     SingleSequenceRequest = 
         fun model single -> 
             async {
+
+                //set up parameters and Biocontainer + context
                 let targetModel = 
                     match model with
                     |Plant      -> TargetP.Plant
                     |NonPlant   -> TargetP.NonPlant
                     |_          -> failwithf "No model for targetP provided"
 
-                printfn "starting bc context"
-
                 let client = Docker.connect "npipe://./pipe/docker_engine"
-
                 let tpContext = 
-                        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\schneike\Desktop\TargetPTest"
+                        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp"
                         |> Async.RunSynchronously
 
-                printfn "bc context running"
-
+                //read fasta item from input
                 let fastA = 
                     single
                     |> fun x -> x.Replace("\r\n","\n")
@@ -158,27 +156,28 @@ let targetPApi = {
                     |> FastA.fromFileEnumerator id
                     |> Array.ofSeq
 
-                let tmpPath = (sprintf @"C:\Users\schneike\Desktop\TargetPTest\%s.fsa" (System.Guid.NewGuid().ToString()))
-
+                //Save fasta to temporary container path
+                let tmpPath = (sprintf @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString()))
                 fastA.[0]
                 |> singleSequenceToMany
                 |> FastA.write id tmpPath
 
-                printfn "Fasta read"
-
+                //Run Biocontainer
                 let header = fastA.[0].Header
-
-                printfn "starting targetP task"
-
                 let scores = 
                     TargetPServer.runWithMount tpContext targetModel tmpPath
                     |> Seq.map (fun x -> x.Mtp)
                     |> Array.ofSeq
 
-                printfn "targetP done"
+                //Cleanup
+                //dispose running container
+                BioContainer.disposeAsync tpContext
+                |> Async.RunSynchronously
+                //delete temporary file
+                File.Delete(tmpPath)
 
+                //return result
                 let plot = plotFromScores 1 scores
-
                 return {   
                         Header      =   header
                         Sequence    =   new System.String (fastA.[0].Sequence |> Array.ofSeq)
@@ -186,57 +185,52 @@ let targetPApi = {
                         PlotHtml    =   plot
                         }
             }
-    FastaFileRequest = 
-        fun model file -> 
-            async {
-
-                let targetModel = 
-                    match model with
-                    |Plant      -> TargetP.Plant
-                    |NonPlant   -> TargetP.NonPlant
-                    |_          -> failwithf "No model for targetP provided"
-
-                let client = Docker.connect "npipe://./pipe/docker_engine"
-                let tpContext = 
-                    BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\schneike\Desktop\TargetPTest"
-                    |> Async.RunSynchronously
-
-                printfn "bc context running"
-                let fastA = 
-                    file
-                    |> fun x -> x.Replace("\r\n","\n")
-                    |> String.split '\n'
-                    |> FastA.fromFileEnumerator id
-                    |> Array.ofSeq
-                let results =
-                    fastA
-                    |> Array.mapi (fun i fastaItem -> 
-                                    let header = fastaItem.Header
-                                    let sequences = fastaItem |> singleSequenceToMany
-                                    let tmpPath = (sprintf @"C:\Users\schneike\Desktop\TargetPTest\%s.fsa" (System.Guid.NewGuid().ToString()))
-
-                                    sequences
-                                    |> FastA.write id tmpPath
-                                    //printfn "inputSequences: \n %A" sequences 
-                                    printfn "starting targetP task"
-
-                                    let scores = 
-                                        try 
-                                            TargetPServer.runWithMount tpContext targetModel tmpPath
-                                            |> Seq.map (fun x -> x.Mtp)
-                                            |> Array.ofSeq
-                                        with e as exn ->    printfn "%s" e.Message
-                                                            [||]
-                                    let plot = plotFromScores i scores
-                                    {   
-                                        Header      =   header
-                                        Sequence    =   new System.String (fastaItem.Sequence |> Array.ofSeq)
-                                        Scores      =   scores
-                                        PlotHtml    =   plot
-                                    })
-                printfn "targetP done."
-                return results
-            }
+    //FastaFileRequest = 
+    //    fun model file -> 
+    //        async {
+    //            let targetModel = 
+    //                match model with
+    //                |Plant      -> TargetP.Plant
+    //                |NonPlant   -> TargetP.NonPlant
+    //                |_          -> failwithf "No model for targetP provided"
+    //            let client = Docker.connect "npipe://./pipe/docker_engine"
+    //            let tpContext = 
+    //                BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\schneike\Desktop\TargetPTest"
+    //                |> Async.RunSynchronously
+    //            printfn "bc context running"
+    //            let fastA = 
+    //                file
+    //                |> fun x -> x.Replace("\r\n","\n")
+    //                |> String.split '\n'
+    //                |> FastA.fromFileEnumerator id
+    //                |> Array.ofSeq
+    //            let results =
+    //                fastA
+    //                |> Array.mapi (fun i fastaItem -> 
+    //                                let header = fastaItem.Header
+    //                                let sequences = fastaItem |> singleSequenceToMany
+    //                                let tmpPath = (sprintf @"C:\Users\schneike\Desktop\TargetPTest\%s.fsa" (System.Guid.NewGuid().ToString()))
+    //                                sequences
+    //                                |> FastA.write id tmpPath
+    //                                //printfn "inputSequences: \n %A" sequences 
+    //                                printfn "starting targetP task"
+    //                                let scores = 
+    //                                    try 
+    //                                        TargetPServer.runWithMount tpContext targetModel tmpPath
+    //                                        |> Seq.map (fun x -> x.Mtp)
+    //                                        |> Array.ofSeq
+    //                                    with e as exn ->    printfn "%s" e.Message
+    //                                                        [||]
+    //                                let plot = plotFromScores i scores
+    //                                {   
+    //                                    Header      =   header
+    //                                    Sequence    =   new System.String (fastaItem.Sequence |> Array.ofSeq)
+    //                                    Scores      =   scores
+    //                                    PlotHtml    =   plot
+    //                                })
+    //            printfn "targetP done."
+    //            return results
+    //        }
     DownloadRequestSingle = 
         fun (res,id)-> 
             async { 

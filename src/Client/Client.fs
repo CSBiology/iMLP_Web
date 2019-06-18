@@ -142,13 +142,16 @@ type Model = {
     SelectedTargetPModel    :   TargetPModel
     SingleSequence          :   string
     SingleSequenceResult    :   TargetPResult Option
-    FastaFileInputText      :   string
+    FastaFileInput          :   string []
     FastaFileInputResult    :   (TargetPResult array) Option
     SeqMode                 :   Mode
     ShowResults             :   bool
     CurrentResultViewIndex  :   int
     DownloadReady           :   bool
     DownloadFileName        :   string
+    FileProcessIndex        :   int
+    HasJobRunning           :   bool
+    ShowProgressDetails     :   bool
 }
 
 let initialModel = {
@@ -157,13 +160,16 @@ let initialModel = {
     SelectedTargetPModel    =   TargetPModel.NoModel
     SingleSequence          =   ""
     SingleSequenceResult    =   None
-    FastaFileInputText      =   ""
+    FastaFileInput          =   [|""|]
     FastaFileInputResult    =   None
     SeqMode                 =   Mode.NotSelected
     ShowResults             =   false
     CurrentResultViewIndex  =   0
     DownloadReady           =   false
-    DownloadFileName        =   "IMTS_prediction_results.tsv" 
+    DownloadFileName        =   "IMTS_prediction_results.tsv"
+    FileProcessIndex        =   0
+    HasJobRunning           =   false
+    ShowProgressDetails     =   false
 }
 
 // The Msg type defines what events/actions can occur while the application is running
@@ -171,16 +177,19 @@ let initialModel = {
 type Msg =
 | ToggleBurger
 | TargetPModelSelection     of TargetPModel
+| SeqModeSelection          of Mode
 | FastaUploadInput          of string
 | SingleSequenceInput       of string
 | SingleSequenceRequest
 | SingleSequenceResponse    of Result<TargetPResult,exn>
 | FastaUploadRequest
-| FastaUploadResponse       of Result<(TargetPResult array),exn>
+| FastaUploadResponse       of Result<TargetPResult,exn>
+| FileProcessingDone
 | ShowPlot                  of int 
 | PrepareDownloadCSV
 | DownloadResponse          of Result<unit,exn>
 | DownloadFileNameChange    of string
+| ShowProgressDetails       
 
 let gradientColorTable = [| 
     "#D62728"
@@ -302,12 +311,18 @@ let init () : Model * Cmd<Msg> =
 // these commands in turn, can dispatch messages to which the update function will react.
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
+    |SeqModeSelection sm ->
+        let updatedModel = {currentModel with SeqMode = sm}
+        updatedModel,Cmd.none
+
     | TargetPModelSelection m ->
         let updatedModel = {currentModel with SelectedTargetPModel = m}
         updatedModel,Cmd.none
+
     | ToggleBurger -> 
         let updatedModel = {currentModel with BurgerVisible = not currentModel.BurgerVisible}
         updatedModel,Cmd.none
+
     | SingleSequenceInput s -> 
         let seqMode =
             if s.Length > 0 then 
@@ -316,31 +331,48 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 Mode.NotSelected
         let updatedModel = {currentModel with SingleSequence = s; SeqMode = seqMode}
         updatedModel,Cmd.none
+
     | FastaUploadInput file -> 
         let seqMode =
             if file.Length > 0 then 
                 Mode.File
             else
                 Mode.NotSelected
-        let updatedModel = {currentModel with FastaFileInputText = file; SeqMode = seqMode}
+        let updatedModel = {
+            currentModel with
+                FastaFileInput =
+                    file.Split('>')
+                    |> fun x -> [|yield ([x.[0];x.[1]] |> String.concat ""); yield! x.[2 ..]|]
+                    |> Array.map (sprintf ">%s")
+                SeqMode = seqMode
+            }
         updatedModel,Cmd.none
+
     | SingleSequenceRequest ->
-        let updatedModel = {currentModel with DownloadReady = false}
+        let updatedModel = {currentModel with DownloadReady = false; HasJobRunning = true}
         let requestCmd = 
-            Cmd.ofAsync
+            Cmd.OfAsync.either
                 (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel)
                 currentModel.SingleSequence
                 (Ok >> SingleSequenceResponse)
                 (Error >> SingleSequenceResponse)
         updatedModel,requestCmd
+
     | FastaUploadRequest ->
-        let updatedModel = {currentModel with DownloadReady = false}
-        let requestCmd = 
-            Cmd.ofAsync
-                (Server.targetPApi.FastaFileRequest currentModel.SelectedTargetPModel)
-                currentModel.FastaFileInputText
-                (Ok >> FastaUploadResponse)
-                (Error >> FastaUploadResponse)
+        let updatedModel = {currentModel with DownloadReady = false; HasJobRunning = true}
+        let fileLength = currentModel.FastaFileInput.Length
+        let processIndex = currentModel.FileProcessIndex
+
+        let requestCmd =
+            if processIndex < fileLength then
+                Cmd.OfAsync.either
+                    (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel)
+                    currentModel.FastaFileInput.[processIndex]
+                    (Ok >> FastaUploadResponse)
+                    (Error >> FastaUploadResponse)
+            else
+                Cmd.ofMsg FileProcessingDone
+                    
         updatedModel,requestCmd
 
     | SingleSequenceResponse (Ok res) ->
@@ -348,6 +380,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             currentModel with 
                 SingleSequenceResult = Some res
                 ShowResults = true
+                HasJobRunning = false
                 }
         updatedModel,Cmd.none
 
@@ -359,12 +392,17 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | FastaUploadResponse (Ok res) ->
         let updatedModel = {
             currentModel with 
-                FastaFileInputResult = Some res
+                FastaFileInputResult =
+                    match currentModel.FastaFileInputResult with
+                    |Some cres  -> Some [|yield! cres; yield res|]
+                    |None       -> Some [|res|]
                 ShowResults = true
+                FileProcessIndex = currentModel.FileProcessIndex + 1
                 }
-        updatedModel,Cmd.none
+        updatedModel,Cmd.ofMsg FastaUploadRequest
 
     | FastaUploadResponse (Error res) ->
+        //TODO: handle request error!
         console.log(res)
         currentModel,Cmd.none
 
@@ -378,7 +416,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             match currentModel.SingleSequenceResult with
             |Some res ->
                 let requestCmd = 
-                    Cmd.ofAsync
+                    Cmd.OfAsync.either
                         Server.targetPApi.DownloadRequestSingle
                         (res,currentModel.SessionGuid)
                         (Ok >> DownloadResponse)
@@ -389,7 +427,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             match currentModel.FastaFileInputResult with
                 |Some res ->
                     let requestCmd = 
-                        Cmd.ofAsync
+                        Cmd.OfAsync.either
                             Server.targetPApi.DownloadRequestMultiple
                             (res,currentModel.SessionGuid)
                             (Ok >> DownloadResponse)
@@ -397,12 +435,23 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                     currentModel,requestCmd
                 |_ -> currentModel,Cmd.none
         |_ -> currentModel,Cmd.none
+
+    | ShowProgressDetails ->
+        let updatedModel = {currentModel with ShowProgressDetails = not currentModel.ShowProgressDetails}
+        updatedModel, Cmd.none
+
+    | FileProcessingDone ->
+        let updatedModel = {currentModel with HasJobRunning = false}
+        updatedModel, Cmd.none
+
     | DownloadResponse (Ok _) ->
         let updatedModel = {currentModel with DownloadReady = true}
         updatedModel,Cmd.none
+
     | DownloadResponse (Error ex) ->
         let updatedModel = {currentModel with DownloadReady = false}
         updatedModel,Cmd.none
+
     | DownloadFileNameChange dname ->
         let updatedModel = {currentModel with DownloadFileName = dname}
         updatedModel,Cmd.none
@@ -453,19 +502,6 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
-let hero = 
-    Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
-        Hero.body [] [
-            Container.container [] [
-                Heading.h1 [] [
-                    str "Lorem ipsum dolor sit amet"
-                ]
-                Heading.h3 [Heading.IsSubtitle] [
-                    str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat"
-                ]
-            ]
-        ]
-    ]
 
 let pageinateFromIndex (resArray: TargetPResult array) (index:int) (model:Model) (dispatch:Msg->unit)  =
     let ofClass () = 
@@ -544,6 +580,7 @@ let downloadView (model:Model) (dispatch: Msg -> unit) =
     else
         [
             Button.button [
+                        Button.IsLoading model.HasJobRunning
                         Button.Props [Props.Id "prepareDownload"]
                         Button.CustomClass "card-footer-item is-success" 
                         Button.IsFullWidth
@@ -584,15 +621,81 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
             yield! downloadView model dispatch
         ]
     ]
+
+let progressView (max:int) (actual:int) (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
+    let progr = (float model.FileProcessIndex / float model.FastaFileInput.Length)
+    div [] [
+        if model.HasJobRunning then 
+            yield str (if progr < 1. then sprintf "Progress: %i/%i Proteins" model.FileProcessIndex model.FastaFileInput.Length else "Done.")
+            yield progress [Class "progress is-link is-large"; Props.Value progr] [str (sprintf "%.2f%s" (float model.FileProcessIndex / float model.FastaFileInput.Length) "%")]
+        yield Button.button [Button.OnClick (fun _ -> ShowProgressDetails |> dispatch)] [if show then yield str "Hide progress details" else yield str "Show progress details"]
+        yield
+            Container.container [if (not show) then yield Container.Props [Props.Style [Props.Display DisplayOptions.None]]] [
+                Table.table [][
+                    thead [] [
+                        th [] [
+                            str "Protein entry header"
+                        ]
+                        th [] [
+                            str "Status"
+                            ]
+                    ]
+                    tbody [] [
+                       yield!
+                        model.FastaFileInput
+                        |> Array.mapi
+                            (fun i entry ->
+                                let rowEntry =
+                                    [
+                                        td [] [
+                                            str (entry.Split('\n') |> Array.head)
+                                        ]
+                                    ]
+                                if i < model.FileProcessIndex then
+                                    tr [] [
+                                        yield! rowEntry
+                                        yield
+                                            td [] [
+                                                str "Done"
+                                                Icon.icon [] [Fa.i [Fa.Solid.Check] []]
+                                            ]
+                                    ]
+                                elif i = model.FileProcessIndex then
+                                    tr [] [
+                                        yield! rowEntry
+                                        yield
+                                            td [] [
+                                                str "Processing"
+                                                Icon.icon [] [Fa.i [Fa.Solid.Spinner] []]
+                                            ]
+                                    ]
+                                else
+                                    tr [] [
+                                        yield! rowEntry
+                                        yield
+                                            td [] [
+                                                str "Queued"
+                                                Icon.icon [] [Fa.i [Fa.Solid.TruckLoading] []]
+                                            ]
+                                    ]
+                            )
+                    ]
+                ]
+            ]
+    ]
+
 let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult array) =
     let index = model.CurrentResultViewIndex
     let sequence = res.[index].Sequence 
-    let scores = res.[index].Scores 
+    let scores = res.[index].Scores
+    let progr = (float model.FileProcessIndex / float model.FastaFileInput.Length)
     Card.card [] [
         Card.header [] [Heading.h3 [] [str "IMTS prediction results "]]
         Card.content [] [
-            Heading.h4 [] [str "Header"]
-            Heading.h6 [] [str res.[index].Header]
+            progressView model.FileProcessIndex model.FastaFileInput.Length model.ShowProgressDetails model dispatch
+            //str (if progr < 1. then sprintf "Progress: %i/%i Proteins" model.FileProcessIndex model.FastaFileInput.Length else "Done.")
+            //progress [Class "progress is-link is-large"; Props.Value progr] [str (sprintf "%.2f%s" (float model.FileProcessIndex / float model.FastaFileInput.Length) "%")]
+
             br []
             hr []
             br []
@@ -601,26 +704,34 @@ let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult 
                     let resArray = model.FastaFileInputResult.Value
                     let len = resArray.Length 
                     yield pageinateFromIndex res 0 model dispatch
-                    if len>5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
                     yield! pageinateDynamic index res model dispatch
-                    if len>5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
                     yield pageinateFromIndex res (len-1) model dispatch
                 ]
             ]
-            Columns.columns [] [
-                Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is6)] [
-                    br []
-                    br []
-                    br []
-                    Heading.h4 [] [str "Full Sequence"]
-                    fastaFormatDisplay (sequence.ToCharArray()) scores
-                    
-                ]
-                Column.column [Column.Width (Screen.Desktop, Column.Is6); Column.Props [Props.Style [CSSProp.OverflowY "hidden"]]] [
-                    iframe [    Props.SrcDoc res.[index].PlotHtml 
-                                Props.Class "ResultFrame"
-                                Props.Scrolling "no"
-                                    ] [p[] [str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."]]
+            Container.container [] [
+                Columns.columns [Columns.IsCentered] [
+                    Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
+                    Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is6)] [
+                        br []
+                        Heading.h5 [] [str res.[index].Header]
+                        hr []
+                        Heading.h5 [] [str "Sequence score heatmap:"]
+                        fastaFormatDisplay (sequence.ToCharArray()) scores
+                        hr []
+                        Heading.h5 [] [str "IMTS profile:"]
+                        iframe [
+                            Props.SrcDoc res.[index].PlotHtml 
+                            Props.Class "ResultFrame"
+                            Props.Scrolling "no"]
+                            [
+                                p [] [
+                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                                ]
+                        ]
+                    ]
+                    Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
                 ]
             ]
         ]
@@ -637,11 +748,11 @@ let resultSection (model : Model) (dispatch: Msg -> unit) =
                     ] [
         if model.SeqMode = Single then
             match model.SingleSequenceResult with
-            |Some res -> yield singleResult model dispatch res
+            |Some res -> yield Container.container [] [singleResult model dispatch res]
             |None -> ()
         elif model.SeqMode = File then
             match model.FastaFileInputResult with
-            |Some res -> yield multipleResults model dispatch res
+            |Some res -> yield Container.container [] [multipleResults model dispatch res]
             |None -> ()
     ]
 
@@ -667,8 +778,8 @@ let validateInputState (model:Model) =
                 | NoModel   -> false,"No model selected"
                 | _         -> true, "Start computation"
     |File -> 
-        match model.FastaFileInputText with
-        |"" -> false,"No data provided"
+        match model.FastaFileInput with
+        |[||] -> false,"No data provided"
         | _ ->  match model.SelectedTargetPModel with
                 | NoModel   -> false,"No model selected"
                 | _         -> true, "Start computation"
@@ -713,76 +824,216 @@ let targetPModelSelector (isTargetSelector: bool) (model : Model) (dispatch : Ms
         ]
     ]
 
+let modeSelection (model : Model) (dispatch : Msg -> unit) =
+    match model.SeqMode with
+    | Single | NotSelected ->
+        Textarea.textarea [
+            Textarea.Placeholder "insert a single amino acid sequence here"
+            Textarea.OnChange (fun e -> let sequence = !!e.target?value
+                                        SingleSequenceInput sequence |> dispatch)
 
-let view (model : Model) (dispatch : Msg -> unit) =
+                ] []
+    | _ ->
+        File.file [File.IsBoxed;File.IsRight;File.HasName] [
+            File.label [] [
+                singleFileInput [
+                    Props.Hidden true
+                    OnTextReceived(fun x -> FastaUploadInput x.Data |> dispatch)
+                    ] 
+                File.cta [] [
+                    str "Click to choose a file"
+                    Icon.icon [] [Fa.i [Fa.Solid.Download] []]
+                ]
+                File.name [] [str ""]
+            ]
+        ]
+
+
+let inputSelection (model : Model) (dispatch : Msg -> unit) =
     let isValidState,buttonMsg = validateInputState model
     let isSingle = model.SeqMode = Single
     let isFile = model.SeqMode = File
-    div [] [
-        navbar model dispatch
-        hero
-        Section.section [Section.CustomClass "csbSection"] [
-            Container.container [] [
-                Heading.h3 [] [str "Lorem ipsum dolor sit amet"]
-                Heading.h4 [] [str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat"]            
-                Tile.ancestor [] [
-                    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
-                        Heading.h4 [] [str "LOREM"]
-                        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
-                        Textarea.textarea [
-                                            Textarea.Placeholder "insert a single amino acid sequence here"
-                                            Textarea.OnChange (fun e -> let sequence = !!e.target?value
-                                                                        SingleSequenceInput sequence |> dispatch)
-                                        
-                        ] []
-                        br []
-                        targetPModelSelector isSingle model dispatch
-                        Button.button [
-                            (if isValidState && (model.SeqMode = Single) then
-                                Button.Disabled false 
-                            else 
-                                Button.Disabled true)
+    let selectionClassPlant = 
+        match model.SelectedTargetPModel with
+        | Plant -> "is-selected-model"
+        | _     -> ""
 
-                            (if isValidState && (model.SeqMode = Single) then
-                                Button.CustomClass "is-success"
-                            else 
-                                Button.CustomClass "is-danger" )
-                            Button.OnClick (fun e -> SingleSequenceRequest |> dispatch)
-                        ] [str (if not isFile then buttonMsg else "Insert or Update Sequence")]
-                    ]
-                    Tile.child [Tile.Size Tile.Is2][]
-                    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
-                        Heading.h4 [] [str "LOREM"]
-                        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
-                        File.file [File.IsBoxed;File.IsCentered] [
-                            File.label [] [
-                                singleFileInput [
-                                    Props.Hidden true
-                                    OnTextReceived(fun x -> FastaUploadInput x.Data |> dispatch)
-                                    ] 
-                                File.cta [] [
-                                    Icon.icon [] [Fa.i [Fa.Solid.Download] []]
-                                ]
+    let selectionClassNonPlant = 
+        match model.SelectedTargetPModel with
+        | NonPlant  -> "is-selected-model"
+        | _         -> ""
+
+    let leftHeader,leftAlternative =
+        match model.SeqMode with 
+        | Single | NotSelected -> "Type in a single FASTA conform protein sequence (with header)", ">> Upload a protein FASTA file instead"
+        | _ -> "Upload a protein FASTA file", ">> Type in a single FASTA conform sequence instead"
+
+    
+    div [] [
+        Columns.columns [Columns.CustomClass "ProcessDecision"] [
+            Column.column [Column.CustomClass "leftSelector"] [
+                Columns.columns [] [
+                    Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
+                    Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
+                        Heading.h3 []
+                            [
+                                str leftHeader
+                            ]
+                        Heading.h4 [] [
+                            a [ Class "leftAlternative"
+                                Props.OnClick
+                                    (fun _ ->
+                                        match model.SeqMode with 
+                                        | Single | NotSelected -> SeqModeSelection File |> dispatch
+                                        | _ -> SeqModeSelection Single |> dispatch
+                                    )] [
+                                str leftAlternative
                             ]
                         ]
-                        br []
-                        targetPModelSelector (not isSingle) model dispatch
-                        Button.button [
-                            (if isValidState && (model.SeqMode = File) then
-                                Button.Disabled false 
-                            else 
-                                Button.Disabled true)
+                        modeSelection model dispatch
+                    ]
+                ]
+            ]
+            Column.column [Column.CustomClass "rightSelector"] [
+                Columns.columns [] [
+                    Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
+                        Heading.h3 [] [str "Select the model that is closest to your organism of interest and start the IMTS prediction"]
+                        Columns.columns [] [
+                            Column.column [] [
+                                Heading.h6 [] [str "Plant"]
+                                Image.image [
+                                                Image.Option.Is128x128;
+                                                Image.CustomClass (sprintf "is-centered is-inline-block is-rounded %s" selectionClassPlant)] [
+                                                img [
+                                                    Props.Src "/Images/PlantModel.png";
+                                                    Props.OnClick (fun ev -> if not (model.SeqMode = NotSelected) then TargetPModelSelection TargetPModel.Plant |> dispatch)
+                                                ]
+                                            ]
 
-                            (if isValidState && (model.SeqMode = File) then
-                                Button.CustomClass "is-success"
-                            else 
-                                Button.CustomClass "is-danger" )
-                            Button.OnClick (fun e -> FastaUploadRequest |> dispatch)
-                        ] [str (if not isSingle then buttonMsg else "Upload or Update Fasta File")]
-                    ] 
+                            ]
+                            Column.column [] [
+                                Heading.h6 [] [str "Non-Plant"]
+                                Image.image [
+                                        Image.Option.Is128x128;
+                                        Image.CustomClass (sprintf "is-centered is-inline-block is-rounded %s" selectionClassNonPlant)] [
+                                        img [
+                                                Props.Src "/Images/YeastModel.png"
+                                                Props.OnClick (fun ev -> if not (model.SeqMode = NotSelected) then TargetPModelSelection TargetPModel.Plant |> dispatch)
+                                                ]
+                                            ]
+                                Button.button [
+                                    (if isValidState then
+                                        Button.Disabled false 
+                                    else 
+                                        Button.Disabled true)
+
+                                    (if isValidState then
+                                        Button.CustomClass "is-success"
+                                    else 
+                                        Button.CustomClass "is-danger" )
+
+                                    Button.IsLoading model.HasJobRunning
+
+                                    Button.OnClick (fun e ->
+                                        match model.SeqMode with
+                                        | Single    -> SingleSequenceRequest |> dispatch
+                                        | File      -> FastaUploadRequest |> dispatch
+                                        | _ -> ())
+                                ] [str buttonMsg ]
+                            ]
+                        ]
+                    ]
+                    Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
                 ]
             ]
         ]
+    ]
+    
+
+let hero (model : Model) (dispatch : Msg -> unit) =
+    Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
+        Hero.body [] [
+            Container.container [] [
+                br []
+                br []
+                Heading.h1 [] [
+                    str "Lorem ipsum dolor sit amet"
+                ]
+                br []
+                Heading.h3 [Heading.IsSubtitle] [
+                    str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam eratLorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."
+                ]
+                //inputSelection model dispatch
+                //Tile.ancestor [] [
+                //    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
+                //        Heading.h4 [] [str "LOREM"]
+                //        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
+                //        Textarea.textarea [
+                //                            Textarea.Placeholder "insert a single amino acid sequence here"
+                //                            Textarea.OnChange (fun e -> let sequence = !!e.target?value
+                //                                                        SingleSequenceInput sequence |> dispatch)
+                //        ] []
+                //        br []
+                //        targetPModelSelector isSingle model dispatch
+                //        Button.button [
+                //            (if isValidState && (model.SeqMode = Single) then
+                //                Button.Disabled false 
+                //            else 
+                //                Button.Disabled true)
+                //            (if isValidState && (model.SeqMode = Single) then
+                //                Button.CustomClass "is-success"
+                //            else 
+                //                Button.CustomClass "is-danger" )
+                //            Button.IsLoading model.HasJobRunning
+                //            Button.OnClick (fun e -> SingleSequenceRequest |> dispatch)
+                //        ] [str (if not isFile then buttonMsg else "Insert or Update Sequence")]
+                //    ]
+                //    Tile.child [Tile.Size Tile.Is2][]
+                //    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
+                //        Heading.h4 [] [str "LOREM"]
+                //        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
+                //        File.file [File.IsBoxed;File.IsCentered] [
+                //            File.label [] [
+                //                singleFileInput [
+                //                    Props.Hidden true
+                //                    OnTextReceived(fun x -> FastaUploadInput x.Data |> dispatch)
+                //                    ] 
+                //                File.cta [] [
+                //                    Icon.icon [] [Fa.i [Fa.Solid.Download] []]
+                //                ]
+                //            ]
+                //        ]
+                //        br []
+                //        targetPModelSelector (not isSingle) model dispatch
+                //        Button.button [
+                //            (if isValidState && (model.SeqMode = File) then
+                //                Button.Disabled false 
+                //            else 
+                //                Button.Disabled true)
+                //            (if isValidState && (model.SeqMode = File) then
+                //                Button.CustomClass "is-success"
+                //            else 
+                //                Button.CustomClass "is-danger" )
+                //            Button.OnClick (fun e -> FastaUploadRequest |> dispatch)
+                //        ] [str (if not isSingle then buttonMsg else "Upload or Update Fasta File")]
+                //    ] 
+                //]
+            ]
+        ]
+    ]
+
+let view (model : Model) (dispatch : Msg -> unit) =
+
+    div [] [
+        navbar model dispatch
+        hero model dispatch
+        //Section.section [Section.CustomClass "csbSection"] [
+        //    Container.container [] [
+        //        Heading.h3 [] [str "Lorem ipsum dolor sit amet"]
+        //        Heading.h4 [] [str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat"]            
+        //    ]
+        //]
+        inputSelection model dispatch
         resultSection model dispatch
         Footer.footer [] [
             Container.container [] [

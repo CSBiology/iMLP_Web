@@ -23,11 +23,18 @@ body {
 }
 
 .section.csbSection{
-    background-color : rgb(222, 235, 247);
+    background-color : rgb(222, 235, 247, 0.8);
+    opacity : 0.6;
+
 }
 
 .section.resultSection {
-    background-color: rgb(68,84,106);
+    background-color: rgb(222, 235, 247, 0.8);
+}
+
+.ProcessDecision {
+    /*background-color: #fafafa;*/
+    /*margin: 0 0 0 0;*/
 }
 
 .tile.csbTile {
@@ -57,7 +64,30 @@ body {
     font-weight: 1200;
 }
 
-a[download]{
+.leftSelector {
+    background-color: rgba(222, 235, 247, 0.9);
+    text-align:right;
+}
+
+.leftAlternative {
+    text-decoration: none
+}
+
+.leftAlternative:hover {
+    color: white;
+    background-color: rgb(68,84,106);
+}
+
+.rightSelector .title {
+    color: white;
+}
+.rightSelector {
+    background-color: rgba(68,84,106, 0.9);
+    text-align: left;
+
+}
+
+a[download] {
     font-size: 1.5em;
     line-height: 100%;
     background-color: #22c65b;
