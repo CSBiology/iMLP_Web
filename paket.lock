@@ -806,15 +806,15 @@ NUGET
       FSharp.Core
       FSharpAux
       FSharpAux.IO
-      Newtonsoft.Json (>= 10.0.3)
+      NewtonSoft.Json (>= 10.0.3)
   remote: https://api.nuget.org/v3/index.json
     Docker.dotnet (3.125.2)
-      Newtonsoft.Json (>= 9.0.1)
+      NewtonSoft.Json (>= 9.0.1)
       System.Buffers (>= 4.4)
       System.ValueTuple (>= 4.4)
     Fable.Remoting.Json (2.3)
       FSharp.Core (>= 4.3.4)
-      Newtonsoft.Json (>= 11.0.1)
+      NewtonSoft.Json (>= 11.0.1)
     Fable.Remoting.Server (4.7)
       Fable.Remoting.Json (>= 2.3)
       FSharp.Core (>= 4.3.4)
@@ -825,12 +825,14 @@ NUGET
       Suave (>= 2.5.4)
     FSharp.Core (4.6.2)
     FSharp.Plotly (1.1.21)
-    Newtonsoft.Json (12.0.2)
+    NewtonSoft.Json (12.0.2)
     SharpZipLib (1.1)
     Suave (2.5.5)
       FSharp.Core (>= 4.3.4 < 5.0)
     System.Buffers (4.5)
     System.ValueTuple (4.5)
+  remote: paket-files/server/github.com/CSBiology/FSharp.Stats
+    FSharp.Stats (0.0.14)
   remote: paket-files/server/github.com/CSBiology/FSharpAux
     FSharpAux (0.0.13)
     FSharpAux.IO (0.0.13)
@@ -840,4 +842,7 @@ GIT
       path: /
   remote: https://github.com/CSBiology/BioFSharp.git
      (8cd93e40f0b630da0fc00e132f72572ec418ae25)
+      path: /
+  remote: https://github.com/CSBiology/FSharp.Stats.git
+     (4bf757c3edf0a73ac064ba0c445a1f0f0bfc14f4)
       path: /

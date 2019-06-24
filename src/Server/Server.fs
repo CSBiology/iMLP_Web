@@ -25,6 +25,87 @@ open FSharpAux
 open Suave.Logging
 
 
+module Propensity =
+    open FSharp.Stats
+
+    let n = 3 // !!!
+    
+    let ofWindowed n (source:float[]) =
+       if n < 0 then invalidArg "n" "n must be a positive integer"
+       let lastIndex = source.Length - 1
+       let arrSize = n + n + 1 |> float
+    
+       let globalMean = 0.1882641482
+       let globalVar  = 0.1241744172
+    
+       let pfArr =
+           source
+           |> FSharp.Stats.Signal.Filtering.savitzky_golay (if source.Length < 21 then 3 else 21) 1 0 0
+           |> Seq.toArray
+    
+       Array.init source.Length
+           (fun i ->
+               match i with
+               | pos when pos < n ->
+                   Array.foldSub (+) 0.0 pfArr 0 (pos+n) / float (pos+n+1)
+               | pos when pos+n > lastIndex  ->
+                   Array.foldSub (+) 0.0 pfArr (pos-n) lastIndex / float (source.Length-pos+n)
+               | _ ->
+                   Array.foldSub (+) 0.0 pfArr (i-n) (i+n) / arrSize
+           )
+       |> Array.map (fun x -> (x - globalMean) / globalVar )
+
+
+module PlotHelpers =
+    let xAxis title =
+        Axis.LinearAxis.init
+            (
+                Title=title,
+                Showgrid=false,
+                Showline=true,
+                Mirror=StyleParam.Mirror.All,
+                Zeroline=false,
+                Tickmode=StyleParam.TickMode.Auto,
+                Ticks= StyleParam.TickOptions.Inside,
+                Tickfont=Font.init(StyleParam.FontFamily.Arial,Size=18),
+                Titlefont=Font.init(StyleParam.FontFamily.Arial,Size=18)
+            )
+
+    let yAxis title =
+        Axis.LinearAxis.init
+            (
+                Title=title,
+                Showgrid=false,
+                Showline=true,
+                Mirror=StyleParam.Mirror.All,
+                Tickmode=StyleParam.TickMode.Auto,
+                Ticks= StyleParam.TickOptions.Inside,
+                Tickfont=Font.init(StyleParam.FontFamily.Arial,Size=18.),
+                Titlefont=Font.init(StyleParam.FontFamily.Arial,Size=18.)
+            )
+
+    let csbDarkBlue = FSharpAux.Colors.fromRgb 68 84 106
+
+    let csbOrange = FSharpAux.Colors.fromRgb 237 125 49
+
+    let plotFromScores (index:int) (scores: float array) = 
+        let vals = 
+            scores
+            |> Array.mapi (fun i x -> (i+1,x)) 
+        let plot =
+            [
+                Chart.Spline(vals,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "Smoothed")
+                Chart.Column(vals,Color = FSharpAux.Colors.toWebColor csbDarkBlue,Name = "Scores")
+            
+            ]
+            |> Chart.Combine
+            |> Chart.withY_Axis(xAxis "Score")
+            |> Chart.withX_Axis(yAxis "Index of AminoAcid")
+            |> Chart.withTitle("iMTS-L propensity")
+            |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
+            |> Chart.withSize(600.,600.)
+
+        GenericChart.toEmbeddedHTML plot
 
 module ServerPath =
     let workingDirectory =
@@ -64,19 +145,6 @@ let config =
         SuaveConfig.bufferSize = 1048576
         }
 
-let plotFromScores (index:int) (scores: float array) = 
-    let vals = 
-        scores
-        |> Array.mapi (fun i x -> (i+1,x)) 
-    let plot =
-        Chart.Column(vals)
-        |> Chart.withY_AxisStyle("Score")
-        |> Chart.withX_AxisStyle("Index of AminoAcid")
-        |> Chart.withTitle(string index)
-        |> Chart.withSize(600.,400.) 
-    printfn "%A" plot
-    GenericChart.toEmbeddedHTML plot
-
 let rand = new System.Random()
 
 let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
@@ -99,37 +167,6 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
         yield
             FastA.createFastaItem (sprintf ">%s" header) (Seq.skip i sequence) 
             ]
-
-open BioFSharp.BioTools.Blast
-
-let testBlastImg () =
-    let client = Docker.connect "npipe://./pipe/docker_engine"
-    let ImageBlast = Docker.DockerId.ImageId "blast"
-    let bcContext =
-        BioContainer.initBcContextWithMountAsync client ImageBlast @"C:\Users\schneike\Desktop\BlastTestImage"
-        |> Async.RunSynchronously
-    
-    let paramz =
-        [
-            MakeDbParams.DbType Protein
-            MakeDbParams.Input @"C:\Users\schneike\Desktop\BlastTestImage\Chlamy_Cp.fastA"
-            MakeDbParams.Output@"C:\Users\schneike\Desktop\BlastTestImage\Chlamy_Cp.fastA"
-        ]
-    runMakeBlastDBAsync bcContext paramz
-        |> Async.RunSynchronously
-
-let testTargetPMount () =
-    let client = Docker.connect "npipe://./pipe/docker_engine"
-
-    let tpContext = 
-        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\schneike\Desktop\TargetPTest"
-        |> Async.RunSynchronously
-
-    File.Copy(@"C:\Users\schneike\Desktop\TargetPTest\twelve.fsa",@"C:\Users\schneike\Desktop\TargetPTest\twelve2.fsa")
-
-    let result = TargetPServer.runWithMount tpContext TargetP.Plant @"C:\Users\schneike\Desktop\TargetPTest\twelve2.fsa"
-
-    printfn "TargetP with mount result: \n%A" result
 
 let targetPApi = {
     SingleSequenceRequest = 
@@ -159,6 +196,7 @@ let targetPApi = {
                 //Save fasta to temporary container path
                 let tmpPath = (sprintf @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString()))
                 fastA.[0]
+                |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
                 |> singleSequenceToMany
                 |> FastA.write id tmpPath
 
@@ -177,12 +215,14 @@ let targetPApi = {
                 File.Delete(tmpPath)
 
                 //return result
-                let plot = plotFromScores 1 scores
+                let propensity = Propensity.ofWindowed 3 scores
+                let propensityPlot = PlotHelpers.plotFromScores 1 propensity
                 return {   
                         Header      =   header
-                        Sequence    =   new System.String (fastA.[0].Sequence |> Array.ofSeq)
+                        Sequence    =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
                         Scores      =   scores
-                        PlotHtml    =   plot
+                        Propensity  =   propensity
+                        PlotHtml    =   propensityPlot
                         }
             }
     //FastaFileRequest = 
@@ -259,7 +299,7 @@ let errorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) : ErrorResu
     printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
     // decide whether or not you want to propagate the error to the client
     match ex with
-    | _ ->  Propagate {errorMsg = (sprintf "%s" ex.Message)}
+    | _ ->  Propagate {errorMsg = (sprintf "%s \r\n %A" ex.Message ex.StackTrace)}
 
 let webApi =
     Remoting.createApi()

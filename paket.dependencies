@@ -19,6 +19,9 @@ group Server
     nuget BioFSharp.IO
     nuget BioFSharp.BioTools
 
+    git https://github.com/CSBiology/FSharp.Stats.git nuget Packages: /
+    nuget FSharp.Stats
+
 group Client
     source https://api.nuget.org/v3/index.json
     framework: netstandard2.0

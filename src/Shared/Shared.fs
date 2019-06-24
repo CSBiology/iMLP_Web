@@ -16,6 +16,7 @@ type TargetPResult = {
     Header      : string
     Sequence    : string
     Scores      : float array
+    Propensity  : float array
     PlotHtml    : string
 }
 

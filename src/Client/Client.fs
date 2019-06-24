@@ -60,7 +60,6 @@ module FileInputHelper =
         readInternal "readAsDataURL" blob
     let readAsArrayBuffer blob: JS.Promise<JS.ArrayBuffer> = 
         readInternal "readAsArrayBuffer" blob
-
     module React = 
         open Fable.React
         open Props
@@ -124,6 +123,25 @@ module Server =
 //      |> Remoting.withRouteBuilder Route.builder
 //      |> Remoting.buildProxy<ICounterApi>
 
+let validateFastaText (fsa:string) =
+    let allSeqs =
+        fsa
+        |> fun x -> x.Replace("\r\n","\n")
+        |> fun x -> x.Split('\n')
+        |> Array.filter (fun x -> not (x.StartsWith(">")))
+    let validSet = set ['A';'C';'D';'E';'F';'G';'H';'I';'K';'L';'M';'N';'O';'P';'Q';'R';'S';'T';'U';'V';'W';'Y';'X';'J';'Z';'B';'*';'-';'\n';'\r']
+
+    let invalidChars =
+        allSeqs
+        |> Array.map (String.filter (fun x -> not (validSet.Contains(x))))
+        |> Array.filter (fun s -> s.Length > 0)
+        |> String.concat ""
+        |> fun x -> [for c in x do yield c]
+        |> List.distinct
+
+    let isValid = invalidChars.Length = 0
+
+    if isValid then Ok fsa else Error (invalidChars)
 
 open FileInputHelper
 open FileInputHelper.React
@@ -134,51 +152,69 @@ type Mode =
 |Single
 |File
 
+type DisplayHelp =
+|NoHelp
+|FAQ
+|Contact
+|HowToUse
+|Publication
+|InputFormat
 
 // The model holds data that you want to keep track of while the application is running
 type Model = { 
-    SessionGuid             :   System.Guid
-    BurgerVisible           :   bool
-    SelectedTargetPModel    :   TargetPModel
-    SingleSequence          :   string
-    SingleSequenceResult    :   TargetPResult Option
-    FastaFileInput          :   string []
-    FastaFileInputResult    :   (TargetPResult array) Option
-    SeqMode                 :   Mode
-    ShowResults             :   bool
-    CurrentResultViewIndex  :   int
-    DownloadReady           :   bool
-    DownloadFileName        :   string
-    FileProcessIndex        :   int
-    HasJobRunning           :   bool
-    ShowProgressDetails     :   bool
+    SessionGuid                 :   System.Guid
+    BurgerVisible               :   bool
+    SelectedTargetPModel        :   TargetPModel
+    SingleSequence              :   string
+    SingleSequenceResult        :   TargetPResult Option
+    FastaFileInput              :   string []
+    FastaFileInputName          :   string
+    FastaFileInputResult        :   (TargetPResult array) Option
+    SeqMode                     :   Mode
+    ShowResults                 :   bool
+    ResultHeadingIsSticky       :   bool
+    CurrentResultViewIndex      :   int
+    DownloadReady               :   bool
+    DownloadFileName            :   string
+    FileProcessIndex            :   int
+    HasValidFasta               :   bool
+    InvalidFastaChars           :   char list
+    HasJobRunning               :   bool
+    ShowProgressDetails         :   bool
+    InformationSectionDisplay   :   DisplayHelp
 }
 
 let initialModel = {
-    SessionGuid             =   System.Guid.NewGuid()
-    BurgerVisible           =   false
-    SelectedTargetPModel    =   TargetPModel.NoModel
-    SingleSequence          =   ""
-    SingleSequenceResult    =   None
-    FastaFileInput          =   [|""|]
-    FastaFileInputResult    =   None
-    SeqMode                 =   Mode.NotSelected
-    ShowResults             =   false
-    CurrentResultViewIndex  =   0
-    DownloadReady           =   false
-    DownloadFileName        =   "IMTS_prediction_results.tsv"
-    FileProcessIndex        =   0
-    HasJobRunning           =   false
-    ShowProgressDetails     =   false
+    SessionGuid              =   System.Guid.NewGuid()
+    BurgerVisible            =   false
+    SelectedTargetPModel     =   TargetPModel.NoModel
+    SingleSequence           =   ""
+    SingleSequenceResult     =   None
+    FastaFileInput           =   [||]
+    FastaFileInputName       =   "No file selected"
+    FastaFileInputResult     =   None
+    SeqMode                  =   Mode.NotSelected
+    ShowResults              =   false
+    ResultHeadingIsSticky    =   false
+    CurrentResultViewIndex   =   0
+    DownloadReady            =   false
+    DownloadFileName         =   "IMTS_prediction_results.tsv"
+    FileProcessIndex         =   0
+    HasValidFasta            =   true
+    InvalidFastaChars        =   []
+    HasJobRunning            =   false
+    ShowProgressDetails      =   false
+    InformationSectionDisplay=   NoHelp
 }
 
 // The Msg type defines what events/actions can occur while the application is running
 // the state of the application changes *only* in reaction to these events
 type Msg =
+| Reset
 | ToggleBurger
 | TargetPModelSelection     of TargetPModel
 | SeqModeSelection          of Mode
-| FastaUploadInput          of string
+| FastaUploadInput          of string*string
 | SingleSequenceInput       of string
 | SingleSequenceRequest
 | SingleSequenceResponse    of Result<TargetPResult,exn>
@@ -189,111 +225,25 @@ type Msg =
 | PrepareDownloadCSV
 | DownloadResponse          of Result<unit,exn>
 | DownloadFileNameChange    of string
-| ShowProgressDetails       
+| ShowProgressDetails
+| ToggleResultHeadingSticky of bool
+| ChangeViewIndex           of int
+| ChangeHelpDisplay         of DisplayHelp
+| FastaValidation           of Result<string,char list>
+| GenericError              of exn
 
-let gradientColorTable = [| 
-    "#D62728"
-    "#D42828"
-    "#D32928"
-    "#D22B28"
-    "#D12C29"
-    "#D02D29"
-    "#CF2F29"
-    "#CE302A"
-    "#CD312A"
-    "#CC332A"
-    "#CB342B"
-    "#CA352B"
-    "#C9372B"
-    "#C8382C"
-    "#C7392C"
-    "#C63B2C"
-    "#C53C2C"
-    "#C43D2D"
-    "#C33F2D"
-    "#C2402D"
-    "#C1412E"
-    "#C0432E"
-    "#BF442E"
-    "#BE452F"
-    "#BD472F"
-    "#BC482F"
-    "#BB4930"
-    "#BA4B30"
-    "#B94C30"
-    "#B84D30"
-    "#B74F31"
-    "#B65031"
-    "#B55131"
-    "#B45332"
-    "#B35432"
-    "#B25532"
-    "#B15733"
-    "#B05833"
-    "#AF5933"
-    "#AE5B34"
-    "#AD5C34"
-    "#AC5D34"
-    "#AB5F35"
-    "#AA6035"
-    "#A96135"
-    "#A86335"
-    "#A76436"
-    "#A66536"
-    "#A56736"
-    "#A46837"
-    "#A36A37"
-    "#A16B37"
-    "#A06C38"
-    "#9F6E38"
-    "#9E6F38"
-    "#9D7039"
-    "#9C7239"
-    "#9B7339"
-    "#9A7439"
-    "#99763A"
-    "#98773A"
-    "#97783A"
-    "#967A3B"
-    "#957B3B"
-    "#947C3B"
-    "#937E3C"
-    "#927F3C"
-    "#91803C"
-    "#90823D"
-    "#8F833D"
-    "#8E843D"
-    "#8D863E"
-    "#8C873E"
-    "#8B883E"
-    "#8A8A3E"
-    "#898B3F"
-    "#888C3F"
-    "#878E3F"
-    "#868F40"
-    "#859040"
-    "#849240"
-    "#839341"
-    "#829441"
-    "#819641"
-    "#809742"
-    "#7F9842"
-    "#7E9A42"
-    "#7D9B42"
-    "#7C9C43"
-    "#7B9E43"
-    "#7A9F43"
-    "#79A044"
-    "#78A244"
-    "#77A344"
-    "#76A445"
-    "#75A645"
-    "#74A745"
-    "#73A846"
-    "#72AA46"
-    "#71AB46"
-    "#70AD47"
-
+let gradientColorTable = [|
+    "#FAEE05"
+    "#FAEE05"
+    "#F8E109"
+    "#F7D40E"
+    "#F5C813"
+    "#F4BB18"
+    "#F2AF1D"
+    "#F1A222"
+    "#EF9627"
+    "#EE892C"
+    "#ED7D31"
 |]
 
 type CustomHTMLAttr = 
@@ -311,7 +261,19 @@ let init () : Model * Cmd<Msg> =
 // these commands in turn, can dispatch messages to which the update function will react.
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
-    |SeqModeSelection sm ->
+    | Reset -> init ()
+    | ChangeHelpDisplay hd ->
+        let updatedModel = {currentModel with InformationSectionDisplay = hd}
+        updatedModel,Cmd.none
+    | ChangeViewIndex i ->
+        let newIndex = currentModel.CurrentResultViewIndex + i
+        let updatedModel =
+            if newIndex >= 0 && newIndex < currentModel.FileProcessIndex then
+                {currentModel with CurrentResultViewIndex = currentModel.CurrentResultViewIndex + i}
+            else
+                currentModel
+        updatedModel,Cmd.none
+    | SeqModeSelection sm ->
         let updatedModel = {currentModel with SeqMode = sm}
         updatedModel,Cmd.none
 
@@ -330,26 +292,56 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             else
                 Mode.NotSelected
         let updatedModel = {currentModel with SingleSequence = s; SeqMode = seqMode}
+        let validateCmd =
+            Cmd.OfFunc.perform
+                validateFastaText
+                s
+                FastaValidation
+
+
+        updatedModel, validateCmd
+
+    | FastaValidation (Ok _) ->
+        let updatedModel = {currentModel with HasValidFasta = true; InvalidFastaChars = []}
         updatedModel,Cmd.none
 
-    | FastaUploadInput file -> 
+    | FastaValidation (Error invalidChars) ->
+        let updatedModel = {currentModel with HasValidFasta = false; InvalidFastaChars = invalidChars}
+        updatedModel,Cmd.none
+        
+
+    | FastaUploadInput (fileData,fileName) -> 
         let seqMode =
-            if file.Length > 0 then 
+            if fileData.Length > 0 then 
                 Mode.File
             else
                 Mode.NotSelected
         let updatedModel = {
             currentModel with
                 FastaFileInput =
-                    file.Split('>')
+                    fileData.Split('>')
                     |> fun x -> [|yield ([x.[0];x.[1]] |> String.concat ""); yield! x.[2 ..]|]
                     |> Array.map (sprintf ">%s")
+                FastaFileInputName = fileName
                 SeqMode = seqMode
             }
-        updatedModel,Cmd.none
+        let validateCmd =
+            Cmd.OfFunc.perform
+                validateFastaText
+                fileData
+
+                FastaValidation
+
+        updatedModel,validateCmd
+            
 
     | SingleSequenceRequest ->
-        let updatedModel = {currentModel with DownloadReady = false; HasJobRunning = true}
+
+        let updatedModel = {
+            currentModel with
+                DownloadReady = false;
+                HasJobRunning = true
+                }
         let requestCmd = 
             Cmd.OfAsync.either
                 (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel)
@@ -359,7 +351,12 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         updatedModel,requestCmd
 
     | FastaUploadRequest ->
-        let updatedModel = {currentModel with DownloadReady = false; HasJobRunning = true}
+
+        let updatedModel = {
+            currentModel with
+                DownloadReady = false;
+                HasJobRunning = true;
+            }
         let fileLength = currentModel.FastaFileInput.Length
         let processIndex = currentModel.FileProcessIndex
 
@@ -405,6 +402,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         //TODO: handle request error!
         console.log(res)
         currentModel,Cmd.none
+
+    | ToggleResultHeadingSticky state ->
+        let updatedModel = {currentModel with ResultHeadingIsSticky = state}
+        updatedModel,Cmd.none
 
     | ShowPlot index ->
         let updatedModel = {currentModel with CurrentResultViewIndex = index}
@@ -457,9 +458,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         updatedModel,Cmd.none
 
 let navbar (model : Model) (dispatch : Msg -> unit) =
+    let currentDisp = model.InformationSectionDisplay
     Navbar.navbar [Navbar.IsFixedTop; Navbar.CustomClass "is-dark csbNav"; Navbar.Props [Props.Role "navigation"; AriaLabel "main navigation" ]] [
         Navbar.Brand.a [] [
-            Navbar.Item.a [] [
+            Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../Images/Logo.png"]
             ]
             Navbar.burger   [
@@ -478,30 +480,115 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
         ]
         Navbar.menu [Navbar.Menu.Props [Id "navbarMenu"; Class (if model.BurgerVisible then "navbar-menu is-active" else "navbar-menu") ]] [
             Navbar.Start.div [] [
-                Navbar.Item.a [] [
-                    str "Lorem"
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = HowToUse then NoHelp else HowToUse) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = HowToUse)
+                    ] [
+                    str "How to use"
                 ]
-                Navbar.Item.a [] [
-                    str "Ipsum "
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = Publication then NoHelp else Publication) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = Publication)
+                    ] [
+                    str "Publication"
                 ]
-                Navbar.Item.a [] [
-                    str "Dolor"
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = InputFormat then NoHelp else InputFormat) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = InputFormat)
+                    ] [
+                    str "Input format"
                 ]
             ]
             Navbar.End.div [] [
-                Navbar.Item.a [] [
-                    str "Lorem"
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = FAQ then NoHelp else FAQ) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = FAQ)
+                    ] [
+                    str "FAQ"
                 ]
-                Navbar.Item.a [] [
-                    str "Ipsum"
-                ]
-                Navbar.Item.a [] [
-                    str "Dolor"
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = Contact then NoHelp else Contact) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = Contact)
+                    ] [
+                    str "Contact"
                 ]
             ]
         ]
     ]
 
+let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
+    
+    match model.InformationSectionDisplay with
+    |NoHelp         -> []
+    |FAQ            ->
+        [
+            br []
+            Heading.h4 [] [str "FAQ   "]; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]
+            br []
+            str "None collected yet"
+        ]
+    |Contact        ->
+        [
+            br []
+            Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            br []
+            ul [] [
+                li [] [a[] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
+                li [] [a[] [str "Kevin Schneider"] ; str ", Computational Systems Biology Kaiserslautern"]
+            ]
+        ]
+    |HowToUse       ->
+        [
+            br []
+            Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            br []
+            ol [] [
+                li [] [str "Some stepz"]
+                li [] [str "Some stepz"]
+                li [] [str "Some stepz"]
+                li [] [str "Some stepz"]
+            ]
+        ]
+    |Publication    ->
+        [
+            br []
+            Heading.h4 [] [str "About the publication this service is built on   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            br []
+            str "Lorem ipsum dolor sit amet"
+        ]
+    |InputFormat    ->
+        [
+            br []
+            Heading.h4 [] [str "Input format help   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            br []
+            str "The input for both single sequence or file mode has to be in fasta conform format. As this prediction algorithm predicts iMTS-L propensity of proteins, only protein sequences will produce valid output."
+            br []
+            str "Fasta conform means:"
+            ul [] [
+                li [] [str "each protein sequence is headed by a single line identifying header, started by the '>' character"]
+                li [] [str "The sequence starts in the next line and only consist of valid amino acid characters (ACDEFGHIKLMNOPQRSTUVWY)"]
+                li [] [str "Ambiguity characters (XJZB) are okay"]
+                li [] [str "Gap and terminator characters (- and *) are filtered out by us. Just keep this in mind when you look at your profiles."]
+                li [] [str "All other characters not mentioned above can lead to invalid output."]
+            ]
+        ]
+
+let displayHelpSection (model:Model) (dispatch:Msg->unit) =
+    Section.section
+        [
+            yield Section.CustomClass "HelpSection";
+            if model.InformationSectionDisplay = NoHelp then
+                yield Section.Props [Style [Display DisplayOptions.None]]
+        ] [
+        Container.container [] [
+            Content.content [] (getDisplayHelpText model dispatch)
+        ]
+    ]
 
 let pageinateFromIndex (resArray: TargetPResult array) (index:int) (model:Model) (dispatch:Msg->unit)  =
     let ofClass () = 
@@ -520,21 +607,25 @@ let pageinateDynamic (pos: int) (res: TargetPResult array) (model:Model) (dispat
         let x = indices.[(max 1 (pos-2)) .. (min (pos+2) (res.Length-2)) ]
         printfn "%A" x
         x
-        |> List.map (fun index -> pageinateFromIndex res index model dispatch)
+        |> List.map (fun index -> pageinateFromIndex res index model dispatch) 
     numbers 
 
 let fastaFormatDisplay (sequence:char array) (scores: float array) =
+    console.log(sequence |> Seq.fold (fun a x -> sprintf "%s%c" a x) "")
+    console.log(scores)
     let maxVal = Array.max scores
     let norm = 
         scores
         |> Array.map (fun s -> s/maxVal)
-        |> Array.map2 (fun char score -> int ((score) * 100.) ,char) sequence
+        |> fun x ->
+            console.log(sprintf "score length: %i" x.Length)
+            console.log(sprintf "sequence length: %i" sequence.Length)
+            x |> Array.map2 (fun char score -> int ((score) * 100.) ,char) sequence
     let spans =
         norm 
         |> Array.map (fun (score,char) -> span [Props.Style [
-                                                                    CSSProp.BackgroundColor (gradientColorTable.[score]);
-                                                                    CSSProp.Color "white"
-                                                                    
+                                                                    CSSProp.BackgroundColor (gradientColorTable.[int (round (float score / 10.))]);
+                                                                    CSSProp.Color "#44546A"
                                                                     ]] [b [] [str (string char)]])
     let formatStrings = 
         spans
@@ -545,32 +636,36 @@ let fastaFormatDisplay (sequence:char array) (scores: float array) =
                                                     yield span [] [ str indexText]; 
                                                     yield! spans 
                                                     ])
-    Content.content [Content.CustomClass "is-small"] [
+    Content.content [] [
         yield! formatStrings 
     ]
 
 let downloadBtn (location:string) (model:Model) (dispatch: Msg -> unit)=
-    [
-        div [Props.Class "card-footer-item"] [
+    Columns.columns[] [
+        Column.column [Column.Width (Screen.Desktop, Column.Is2)] [
             str "Enter filename:"
         ]
-        Input.text [
-                    Input.Props [Props.Class "card-footer-item"]
-                    Input.Placeholder model.DownloadFileName
-                    Input.OnChange (fun e ->    let dname = !!e.target?value
-                                                DownloadFileNameChange dname |> dispatch)
-                    ] 
-        a[
-            Props.Download (  if ( model.DownloadFileName.EndsWith(".tsv")) then
-                                    model.DownloadFileName
-                                else 
-                                    sprintf "%s.tsv" model.DownloadFileName
-                                    )
-            Props.Href location
-            Props.Class "card-footer-item is-primary"
-            ] [
-            Icon.icon [] [Fa.i [Fa.Solid.Download] []]
-            str "Click to download"
+        Column.column [Column.Width (Screen.Desktop, Column.Is8)] [
+            Input.text [
+                        Input.Props []
+                        Input.Placeholder model.DownloadFileName
+                        Input.OnChange (fun e ->    let dname = !!e.target?value
+                                                    DownloadFileNameChange dname |> dispatch)
+                        ] 
+        ]
+        Column.column [Column.Width (Screen.Desktop, Column.Is2)] [
+            a[
+                Props.Download (  if ( model.DownloadFileName.EndsWith(".tsv")) then
+                                        model.DownloadFileName
+                                    else 
+                                        sprintf "%s.tsv" model.DownloadFileName
+                                        )
+                Props.Href location
+                Props.Class "is-primary is-full-width"
+                ] [
+                Icon.icon [] [Fa.i [Fa.Solid.Download] []]
+                str "Click to download"
+            ]
         ]
     ]
 
@@ -578,167 +673,246 @@ let downloadView (model:Model) (dispatch: Msg -> unit) =
     if model.DownloadReady then
         downloadBtn (sprintf "./CsvResults/%s.csv" (model.SessionGuid.ToString())) model dispatch
     else
-        [
-            Button.button [
-                        Button.IsLoading model.HasJobRunning
-                        Button.Props [Props.Id "prepareDownload"]
-                        Button.CustomClass "card-footer-item is-success" 
-                        Button.IsFullWidth
-                        Button.OnClick (fun _ -> PrepareDownloadCSV |> dispatch)] [
-                str "Prepare Results as tab separated file for download"
-            ]
+        Button.button [
+                    Button.IsLoading model.HasJobRunning
+                    Button.Props [Props.Id "prepareDownload"]
+                    Button.CustomClass "is-success" 
+                    Button.IsFullWidth
+                    Button.OnClick (fun _ -> PrepareDownloadCSV |> dispatch)] [
+            str "Prepare Results as tab separated file for download"
         ]
 
-let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
-    Card.card [] [
-        Card.header [] [Heading.h3 [] [str "IMTS prediction results "]]
-        Card.content [] [
-            Heading.h4 [] [str "Header"]
-            Heading.h6 [] [str res.Header]
-            br []
-            hr []
-            br []
-            Columns.columns [] [
-                Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is6)] [
-                    br []
-                    br []
-                    br []
-                    Heading.h4 [] [str "Full Sequence"]
-                    fastaFormatDisplay (res.Sequence.ToCharArray()) res.Scores
-                    
-                ]
-                Column.column [Column.Width (Screen.Desktop, Column.Is6); Column.Props [Props.Style [CSSProp.OverflowY "hidden"]]] [
-                    iframe [    Props.SrcDoc res.PlotHtml 
-                                Props.Class "ResultFrame"
-                                Props.Scrolling "no"
-                                    ] [p[] [str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."]
-                                    
+let progressDetails (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
+    div [] [
+        if model.HasJobRunning then 
+            yield Button.button [Button.OnClick (fun _ -> ShowProgressDetails |> dispatch)] [if show then yield str "Hide progress details" else yield str "Show progress details"]
+            yield
+                Container.container [if (not show) then yield Container.Props [Props.Style [Props.Display DisplayOptions.None]]] [
+                    Table.table [][
+                        thead [] [
+                            th [] [
+                                str "Protein entry header"
+                            ]
+                            th [] [
+                                str "Status"
+                                ]
+                        ]
+                        tbody [] [
+                           yield!
+                            model.FastaFileInput
+                            |> Array.mapi
+                                (fun i entry ->
+                                    let rowEntry =
+                                        [
+                                            td [] [
+                                                str (entry.Split('\n') |> Array.head)
+                                            ]
+                                        ]
+                                    if i < model.FileProcessIndex then
+                                        tr [] [
+                                            yield! rowEntry
+                                            yield
+                                                td [] [
+                                                    str "Done"
+                                                    Icon.icon [] [Fa.i [Fa.Solid.Check] []]
+                                                ]
+                                        ]
+                                    elif i = model.FileProcessIndex then
+                                        tr [] [
+                                            yield! rowEntry
+                                            yield
+                                                td [] [
+                                                    str "Processing"
+                                                    Icon.icon [] [Fa.i [Fa.Solid.Spinner] []]
+                                                ]
+                                        ]
+                                    else
+                                        tr [] [
+                                            yield! rowEntry
+                                            yield
+                                                td [] [
+                                                    str "Queued"
+                                                    Icon.icon [] [Fa.i [Fa.Solid.TruckLoading] []]
+                                                ]
+                                        ]
+                                )
+                        ]
                     ]
                 ]
-            ]
-        ]
-        Card.footer [] [
-            yield! downloadView model dispatch
-        ]
     ]
 
-let progressView (max:int) (actual:int) (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
+let progressView (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
     let progr = (float model.FileProcessIndex / float model.FastaFileInput.Length)
     div [] [
         if model.HasJobRunning then 
             yield str (if progr < 1. then sprintf "Progress: %i/%i Proteins" model.FileProcessIndex model.FastaFileInput.Length else "Done.")
             yield progress [Class "progress is-link is-large"; Props.Value progr] [str (sprintf "%.2f%s" (float model.FileProcessIndex / float model.FastaFileInput.Length) "%")]
-        yield Button.button [Button.OnClick (fun _ -> ShowProgressDetails |> dispatch)] [if show then yield str "Hide progress details" else yield str "Show progress details"]
-        yield
-            Container.container [if (not show) then yield Container.Props [Props.Style [Props.Display DisplayOptions.None]]] [
-                Table.table [][
-                    thead [] [
-                        th [] [
-                            str "Protein entry header"
-                        ]
-                        th [] [
-                            str "Status"
+    ]
+
+
+let resultBar (model : Model) (res: TargetPResult [] ) (dispatch : Msg -> unit) =
+    let index = model.CurrentResultViewIndex
+    div
+        [
+            yield Props.Class "resultBar"
+            if (not (model.SeqMode = File && model.FastaFileInputResult.IsSome)) then
+                yield Props.Style [Props.Display DisplayOptions.None]
+        ] [
+            Columns.columns [] [
+                Column.column [Column.Width (Screen.Desktop, Column.Is7);Column.CustomClass "leftResultBar"] [
+                    Heading.h3 [] [str "Navigate through results:"]
+                ]
+                Column.column [Column.Width (Screen.Desktop, Column.Is7);Column.CustomClass "rightResultBar"] [
+                    if model.SeqMode = File && model.FastaFileInputResult.IsSome then
+                        yield
+                            nav [Class "pagination is-left"; Role "navigation"; AriaLabel "pagination"] [
+                                ul [Class "pagination-list"] [
+                                    let resArray = model.FastaFileInputResult.Value
+                                    let len = resArray.Length 
+                                    yield pageinateFromIndex res 0 model dispatch
+                                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                                    yield! pageinateDynamic index res model dispatch
+                                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                                    yield pageinateFromIndex res (len-1) model dispatch
+                                ]
                             ]
-                    ]
-                    tbody [] [
-                       yield!
-                        model.FastaFileInput
-                        |> Array.mapi
-                            (fun i entry ->
-                                let rowEntry =
-                                    [
-                                        td [] [
-                                            str (entry.Split('\n') |> Array.head)
-                                        ]
-                                    ]
-                                if i < model.FileProcessIndex then
-                                    tr [] [
-                                        yield! rowEntry
-                                        yield
-                                            td [] [
-                                                str "Done"
-                                                Icon.icon [] [Fa.i [Fa.Solid.Check] []]
-                                            ]
-                                    ]
-                                elif i = model.FileProcessIndex then
-                                    tr [] [
-                                        yield! rowEntry
-                                        yield
-                                            td [] [
-                                                str "Processing"
-                                                Icon.icon [] [Fa.i [Fa.Solid.Spinner] []]
-                                            ]
-                                    ]
-                                else
-                                    tr [] [
-                                        yield! rowEntry
-                                        yield
-                                            td [] [
-                                                str "Queued"
-                                                Icon.icon [] [Fa.i [Fa.Solid.TruckLoading] []]
-                                            ]
-                                    ]
-                            )
-                    ]
                 ]
             ]
     ]
+
+let resultHeading (model:Model) (dispatch: Msg -> unit)  (res: TargetPResult [] ) =
+    let index = model.CurrentResultViewIndex
+    Columns.columns
+        [
+            if model.ResultHeadingIsSticky then
+                yield Columns.CustomClass "ResultHeadingSticky"
+            else
+                yield Columns.CustomClass "ResultHeadingNonSticky"
+            yield
+                Columns.Props
+                    [
+                        yield Id "ResultHeading"
+                        match model.SeqMode with
+                        |File   when model.FastaFileInputResult.IsSome  -> ()
+                        |Single when model.SingleSequenceResult.IsSome  -> ()
+                        | _                                             -> yield Props.Style [Props.Display DisplayOptions.None]
+                    ]
+
+        ] [
+        Column.column [Column.Width (Screen.Desktop, Column.Is7);Column.CustomClass "leftResultHeading"] [
+            Columns.columns [] [
+                Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
+                Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
+                    br []
+                    Heading.h3 [] [str "Results"]
+                    hr []
+                ]
+            ]
+        ]
+        Column.column [Column.Width (Screen.Desktop, Column.Is5);Column.CustomClass "rightResultHeading"] [
+            Columns.columns [] [
+                Column.column [Column.Width (Screen.Desktop, Column.Is8)] [
+                    yield br []
+                    if model.SeqMode = File && model.FastaFileInputResult.IsSome then
+                        yield
+                            nav [Class "pagination is-left"; Role "navigation"; AriaLabel "pagination"] [
+                                ul [Class "pagination-list"] [
+                                    let resArray = model.FastaFileInputResult.Value
+                                    let len = resArray.Length 
+                                    yield pageinateFromIndex res 0 model dispatch
+                                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                                    yield! pageinateDynamic index res model dispatch
+                                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
+                                    yield pageinateFromIndex res (len-1) model dispatch
+                                ]
+                            ]
+                    else
+                        yield Heading.h3 [] [br[]]
+                    yield hr []
+                    if model.SeqMode = File then
+                        yield progressView model.ShowProgressDetails model dispatch
+                ]
+                Column.column [Column.Width (Screen.Desktop, Column.Is4)] [
+                ]
+            ]
+
+        ]
+    ]
+
+let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
+    Columns.columns [Columns.IsCentered] [
+        Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
+        Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
+            br []
+            Heading.h4 [] [str res.Header]
+            hr []
+            Heading.h4 [] [str "Sequence score heatmap:"]
+            fastaFormatDisplay (res.Sequence.ToCharArray()) res.Scores
+            hr []
+            Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
+            iframe [
+                Props.SrcDoc (res.PlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
+                Props.Class "ResultFrame"
+                Props.Scrolling "no"]
+                [
+                    p [] [
+                        str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                    ]
+            ]
+            Heading.h4 [] [str "Download your results"]
+            hr[]
+            downloadView model dispatch
+        ]
+        Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
+    ]
+
 
 let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult array) =
     let index = model.CurrentResultViewIndex
     let sequence = res.[index].Sequence 
     let scores = res.[index].Scores
     let progr = (float model.FileProcessIndex / float model.FastaFileInput.Length)
-    Card.card [] [
-        Card.header [] [Heading.h3 [] [str "IMTS prediction results "]]
-        Card.content [] [
-            progressView model.FileProcessIndex model.FastaFileInput.Length model.ShowProgressDetails model dispatch
-            //str (if progr < 1. then sprintf "Progress: %i/%i Proteins" model.FileProcessIndex model.FastaFileInput.Length else "Done.")
-            //progress [Class "progress is-link is-large"; Props.Value progr] [str (sprintf "%.2f%s" (float model.FileProcessIndex / float model.FastaFileInput.Length) "%")]
-
+    Columns.columns [Columns.IsCentered] [
+        Column.column
+            [
+                Column.Width (Screen.Desktop, Column.Is2)
+                Column.Props [OnClick (fun _ -> ChangeViewIndex -1 |> dispatch)]
+                Column.CustomClass "viewManipulator"
+            ] [
+                div [Class "has-text-centered"] [str "<"]
+            ]
+        Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
             br []
+            Heading.h4 [] [str res.[index].Header]
             hr []
-            br []
-            nav [Class "pagination is-centered"; Role "navigation"; AriaLabel "pagination"] [
-                ul [Class "pagination-list"] [
-                    let resArray = model.FastaFileInputResult.Value
-                    let len = resArray.Length 
-                    yield pageinateFromIndex res 0 model dispatch
-                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
-                    yield! pageinateDynamic index res model dispatch
-                    if len >5 then yield li [Class "pagination-ellipsis"] [span [] [str "…"]]
-                    yield pageinateFromIndex res (len-1) model dispatch
-                ]
-            ]
-            Container.container [] [
-                Columns.columns [Columns.IsCentered] [
-                    Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
-                    Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is6)] [
-                        br []
-                        Heading.h5 [] [str res.[index].Header]
-                        hr []
-                        Heading.h5 [] [str "Sequence score heatmap:"]
-                        fastaFormatDisplay (sequence.ToCharArray()) scores
-                        hr []
-                        Heading.h5 [] [str "IMTS profile:"]
-                        iframe [
-                            Props.SrcDoc res.[index].PlotHtml 
-                            Props.Class "ResultFrame"
-                            Props.Scrolling "no"]
-                            [
-                                p [] [
-                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                                ]
-                        ]
+            Heading.h4 [] [str "Sequence score heatmap:"]
+            fastaFormatDisplay (sequence.ToCharArray()) scores
+            hr []
+            Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
+            iframe [
+                Props.SrcDoc (res.[index].PlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
+                Props.Class "ResultFrame"
+                Props.Scrolling "no"]
+                [
+                    p [] [
+                        str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
                     ]
-                    Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
-                ]
             ]
+            Heading.h4 [] [str "Download your results"]
+            hr[]
+            downloadView model dispatch
         ]
-        Card.footer [] [
-            yield! downloadView model dispatch
-        ]
+        Column.column
+            [
+                Column.Width (Screen.Desktop, Column.Is2)
+                Column.Props [OnClick (fun _ -> ChangeViewIndex 1 |> dispatch)]
+                Column.CustomClass "viewManipulator"
+            ] [
+                div [Class "has-text-centered"] [str ">"]
+            ]
     ]
+
+
     
 
 let resultSection (model : Model) (dispatch: Msg -> unit) =
@@ -748,26 +922,14 @@ let resultSection (model : Model) (dispatch: Msg -> unit) =
                     ] [
         if model.SeqMode = Single then
             match model.SingleSequenceResult with
-            |Some res -> yield Container.container [] [singleResult model dispatch res]
+            |Some res -> yield singleResult model dispatch res
             |None -> ()
         elif model.SeqMode = File then
             match model.FastaFileInputResult with
-            |Some res -> yield Container.container [] [multipleResults model dispatch res]
+            |Some res -> yield multipleResults model dispatch res
             |None -> ()
     ]
 
-//let results (model : Model) (dispatch : Msg -> unit) =
-//    match model.SeqMode with
-//    |Single ->
-//        Section.section [Section.CustomClass "csbSection"] [
-//            Container.container [] [
-//                resultCard model model.SingleSequenceResult.Value
-//            ]
-//        ]
-//    |File ->
-//        R. div [] []
-//    |_ -> 
-//        R. div [] []
 
 let validateInputState (model:Model) =
     match model.SeqMode with
@@ -775,14 +937,18 @@ let validateInputState (model:Model) =
         match model.SingleSequence with
         |"" -> false,"No data provided"
         | _ ->  match model.SelectedTargetPModel with
-                | NoModel   -> false,"No model selected"
-                | _         -> true, "Start computation"
+                | NoModel   ->  false,"No model selected"
+                | _         ->  match model.HasValidFasta with
+                                | true -> true,"Start computation"
+                                | false -> false, "Fasta is invalid"
     |File -> 
         match model.FastaFileInput with
         |[||] -> false,"No data provided"
         | _ ->  match model.SelectedTargetPModel with
-                | NoModel   -> false,"No model selected"
-                | _         -> true, "Start computation"
+                | NoModel   ->  false,"No model selected"
+                | _         ->  match model.HasValidFasta with
+                                | true -> true,"Start computation"
+                                | false -> false, "Fasta is invalid"
     |_ -> false,"No data provided"
 
 
@@ -828,127 +994,126 @@ let modeSelection (model : Model) (dispatch : Msg -> unit) =
     match model.SeqMode with
     | Single | NotSelected ->
         Textarea.textarea [
-            Textarea.Placeholder "insert a single amino acid sequence here"
+            Textarea.Size Size.IsMedium
+            
+            Textarea.Placeholder "insert a single amino acid sequence in FASTA format (with header)"
             Textarea.OnChange (fun e -> let sequence = !!e.target?value
                                         SingleSequenceInput sequence |> dispatch)
 
                 ] []
     | _ ->
-        File.file [File.IsBoxed;File.IsRight;File.HasName] [
+        File.file [File.IsBoxed;File.IsFullWidth;File.HasName] [
             File.label [] [
                 singleFileInput [
                     Props.Hidden true
-                    OnTextReceived(fun x -> FastaUploadInput x.Data |> dispatch)
+                    OnTextReceived(fun x -> FastaUploadInput (x.Data,x.Name) |> dispatch)
                     ] 
-                File.cta [] [
-                    str "Click to choose a file"
-                    Icon.icon [] [Fa.i [Fa.Solid.Download] []]
+                File.cta [Props [Class "file-cta fastaFileUploadBtn"]] [
+                    Heading.h4 [] [str "Click to choose a file"]
+                    Icon.icon [] [Fa.i [Fa.Solid.Upload] []]
                 ]
-                File.name [] [str ""]
+                File.name [] [str model.FastaFileInputName]
             ]
         ]
 
-
 let inputSelection (model : Model) (dispatch : Msg -> unit) =
     let isValidState,buttonMsg = validateInputState model
-    let isSingle = model.SeqMode = Single
-    let isFile = model.SeqMode = File
-    let selectionClassPlant = 
-        match model.SelectedTargetPModel with
-        | Plant -> "is-selected-model"
-        | _     -> ""
-
-    let selectionClassNonPlant = 
-        match model.SelectedTargetPModel with
-        | NonPlant  -> "is-selected-model"
-        | _         -> ""
 
     let leftHeader,leftAlternative =
         match model.SeqMode with 
-        | Single | NotSelected -> "Type in a single FASTA conform protein sequence (with header)", ">> Upload a protein FASTA file instead"
-        | _ -> "Upload a protein FASTA file", ">> Type in a single FASTA conform sequence instead"
+        | Single | NotSelected -> "Or upload a ", "file"
+        | _ -> "Or insert a single amino acid ", "sequence"
 
     
     div [] [
         Columns.columns [Columns.CustomClass "ProcessDecision"] [
-            Column.column [Column.CustomClass "leftSelector"] [
+            Column.column [Column.Width (Screen.Desktop, Column.Is7);Column.CustomClass "leftSelector"] [
                 Columns.columns [] [
                     Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
                     Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
-                        Heading.h3 []
-                            [
-                                str leftHeader
-                            ]
-                        Heading.h4 [] [
-                            a [ Class "leftAlternative"
-                                Props.OnClick
-                                    (fun _ ->
-                                        match model.SeqMode with 
-                                        | Single | NotSelected -> SeqModeSelection File |> dispatch
-                                        | _ -> SeqModeSelection Single |> dispatch
-                                    )] [
-                                str leftAlternative
-                            ]
-                        ]
-                        modeSelection model dispatch
+                        yield br []
+                        yield Heading.h3 [] [str "Input"]
+                        yield hr []
+                        if (not model.HasValidFasta) then
+                            yield p [Class "is-danger"] [str "Your fasta contained invalid characters:"]
+                            yield p [Class "is-danger"] [str (sprintf "%A" model.InvalidFastaChars)   ]
+                            yield Button.button [Button.CustomClass "is-danger";Button.OnClick (fun _ -> Reset |> dispatch)] [str "Click to reset Input"]
+                        yield modeSelection model dispatch
+                        yield br []
+                        yield
+                            Heading.h5 [Heading.IsSubtitle]
+                                [
+                                    str leftHeader
+                                    a [ Class "leftAlternative"
+                                        Props.OnClick
+                                            (fun _ ->
+                                                match model.SeqMode with 
+                                                | Single | NotSelected -> SeqModeSelection File |> dispatch
+                                                | _ -> SeqModeSelection Single |> dispatch
+                                            )] [
+                                        str leftAlternative
+                                    ]
+                                ]
+                        yield br []
                     ]
                 ]
             ]
-            Column.column [Column.CustomClass "rightSelector"] [
+            Column.column [Column.Width (Screen.Desktop, Column.Is5);Column.CustomClass "rightSelector"] [
                 Columns.columns [] [
-                    Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
-                        Heading.h3 [] [str "Select the model that is closest to your organism of interest and start the IMTS prediction"]
-                        Columns.columns [] [
-                            Column.column [] [
-                                Heading.h6 [] [str "Plant"]
-                                Image.image [
-                                                Image.Option.Is128x128;
-                                                Image.CustomClass (sprintf "is-centered is-inline-block is-rounded %s" selectionClassPlant)] [
-                                                img [
-                                                    Props.Src "/Images/PlantModel.png";
-                                                    Props.OnClick (fun ev -> if not (model.SeqMode = NotSelected) then TargetPModelSelection TargetPModel.Plant |> dispatch)
-                                                ]
-                                            ]
+                    Column.column [Column.Width (Screen.Desktop, Column.Is8)] [
+                        br []
+                        Heading.h3 [] [str "Start Prediction"]
+                        hr []
+                        
+                        Button.button [
+                            (if isValidState then
+                                Button.Disabled false 
+                            else 
+                                Button.Disabled true)
 
+                            (if isValidState then
+                                Button.CustomClass "is-success"
+                            else 
+                                Button.CustomClass "is-danger" )
+
+                            Button.IsLoading model.HasJobRunning 
+                            Button.IsFullWidth
+                            Button.CustomClass "startBtn"
+                            Button.OnClick (fun e ->
+                                match model.SeqMode with
+                                | Single    -> SingleSequenceRequest |> dispatch
+                                | File      -> FastaUploadRequest |> dispatch
+                                | _ -> ())
+                        ] [str buttonMsg ]
+                        br []
+                        Heading.h5 [Heading.IsSubtitle] [str "Select the model that is closest to your organism of interest and start the IMTS prediction:"]
+                        Control.div [] [
+                            Radio.radio [] [
+                                Radio.input
+                                    [
+                                        Radio.Input.Name "ModelSelection"
+                                        Radio.Input.Props [OnClick (fun _ -> TargetPModelSelection TargetPModel.NonPlant |> dispatch)]
+                                    ]
+                                b [] [str "Non-Plant"]
                             ]
-                            Column.column [] [
-                                Heading.h6 [] [str "Non-Plant"]
-                                Image.image [
-                                        Image.Option.Is128x128;
-                                        Image.CustomClass (sprintf "is-centered is-inline-block is-rounded %s" selectionClassNonPlant)] [
-                                        img [
-                                                Props.Src "/Images/YeastModel.png"
-                                                Props.OnClick (fun ev -> if not (model.SeqMode = NotSelected) then TargetPModelSelection TargetPModel.Plant |> dispatch)
-                                                ]
-                                            ]
-                                Button.button [
-                                    (if isValidState then
-                                        Button.Disabled false 
-                                    else 
-                                        Button.Disabled true)
-
-                                    (if isValidState then
-                                        Button.CustomClass "is-success"
-                                    else 
-                                        Button.CustomClass "is-danger" )
-
-                                    Button.IsLoading model.HasJobRunning
-
-                                    Button.OnClick (fun e ->
-                                        match model.SeqMode with
-                                        | Single    -> SingleSequenceRequest |> dispatch
-                                        | File      -> FastaUploadRequest |> dispatch
-                                        | _ -> ())
-                                ] [str buttonMsg ]
+                            Radio.radio [] [
+                                Radio.input
+                                    [
+                                        Radio.Input.Name "ModelSelection"
+                                        Radio.Input.Props [OnClick (fun _ -> TargetPModelSelection TargetPModel.Plant |> dispatch)]
+                                    ]
+                                b [] [str "Plant (experimental)"]
                             ]
                         ]
+                        br []
                     ]
-                    Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
+                    Column.column [Column.Width (Screen.Desktop, Column.Is4)] []
                 ]
+                
             ]
         ]
     ]
-    
+
 
 let hero (model : Model) (dispatch : Msg -> unit) =
     Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
@@ -957,97 +1122,63 @@ let hero (model : Model) (dispatch : Msg -> unit) =
                 br []
                 br []
                 Heading.h1 [] [
-                    str "Lorem ipsum dolor sit amet"
+                    str "iMTS-Ls Prediction"
                 ]
                 br []
                 Heading.h3 [Heading.IsSubtitle] [
-                    str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam eratLorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."
-                ]
-                //inputSelection model dispatch
-                //Tile.ancestor [] [
-                //    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
-                //        Heading.h4 [] [str "LOREM"]
-                //        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
-                //        Textarea.textarea [
-                //                            Textarea.Placeholder "insert a single amino acid sequence here"
-                //                            Textarea.OnChange (fun e -> let sequence = !!e.target?value
-                //                                                        SingleSequenceInput sequence |> dispatch)
-                //        ] []
-                //        br []
-                //        targetPModelSelector isSingle model dispatch
-                //        Button.button [
-                //            (if isValidState && (model.SeqMode = Single) then
-                //                Button.Disabled false 
-                //            else 
-                //                Button.Disabled true)
-                //            (if isValidState && (model.SeqMode = Single) then
-                //                Button.CustomClass "is-success"
-                //            else 
-                //                Button.CustomClass "is-danger" )
-                //            Button.IsLoading model.HasJobRunning
-                //            Button.OnClick (fun e -> SingleSequenceRequest |> dispatch)
-                //        ] [str (if not isFile then buttonMsg else "Insert or Update Sequence")]
-                //    ]
-                //    Tile.child [Tile.Size Tile.Is2][]
-                //    Tile.child [Tile.Size Tile.Is5; Tile.CustomClass "notification csbTile"] [
-                //        Heading.h4 [] [str "LOREM"]
-                //        p [] [str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."]
-                //        File.file [File.IsBoxed;File.IsCentered] [
-                //            File.label [] [
-                //                singleFileInput [
-                //                    Props.Hidden true
-                //                    OnTextReceived(fun x -> FastaUploadInput x.Data |> dispatch)
-                //                    ] 
-                //                File.cta [] [
-                //                    Icon.icon [] [Fa.i [Fa.Solid.Download] []]
-                //                ]
-                //            ]
-                //        ]
-                //        br []
-                //        targetPModelSelector (not isSingle) model dispatch
-                //        Button.button [
-                //            (if isValidState && (model.SeqMode = File) then
-                //                Button.Disabled false 
-                //            else 
-                //                Button.Disabled true)
-                //            (if isValidState && (model.SeqMode = File) then
-                //                Button.CustomClass "is-success"
-                //            else 
-                //                Button.CustomClass "is-danger" )
-                //            Button.OnClick (fun e -> FastaUploadRequest |> dispatch)
-                //        ] [str (if not isSingle then buttonMsg else "Upload or Update Fasta File")]
-                //    ] 
-                //]
+                    str "Additional to their N-terminal matrix-targeting signals (MTSs), many preproteins contain additional internal MTS-like signals (iMTS-Ls) in their mature region that share similar characteristic properties. Tom70-mediated interaction with these iMTS-Ls improves the import competence of preproteins and increases the efficiency of their translocation into the mitochondrial matrix."
+                    br []
+                    br []
+                    str"For more information see Backes et al. 2018 [DOI: 10.1083/jcb.201708044]."
+                    br []
+                    br []
+                    str "This tool allows the prediction of iMTS-Ls for proteins of interest."
+                    ]
             ]
         ]
     ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
 
-    div [] [
+    div [][
         navbar model dispatch
+        displayHelpSection model dispatch
         hero model dispatch
-        //Section.section [Section.CustomClass "csbSection"] [
-        //    Container.container [] [
-        //        Heading.h3 [] [str "Lorem ipsum dolor sit amet"]
-        //        Heading.h4 [] [str "consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat"]            
-        //    ]
-        //]
         inputSelection model dispatch
+        resultHeading model dispatch (match model.FastaFileInputResult with |Some r -> r | _ -> [||])
         resultSection model dispatch
         Footer.footer [] [
             Container.container [] [
-                Content.content [Content.CustomClass "has-text-centered"] [
-                    p [] [
-                        str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."
-                    ]
-                ]
                 Columns.columns [] [
                     Column.column [] [
-                        str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."
+                        
+                        str "built with <3,"
+                        ul [] [
+                            br []
+                            li [Props.Href "" ] [a [] [str "F#"; str","]]
+                            br []
+                            li [Props.Href "" ] [a [] [str "BioFSharp"]; str","]
+                            br []
+                            li [Props.Href "" ] [str "and ";a [] [str "SAFE Stack"]]
+                        ] 
                     ]
                     Column.column [] [
-                        str "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Proin ornare magna eros, eu pellentesque tortor vestibulum ut. Maecenas non massa sem. Etiam finibus odio quis feugiat facilisis."
+                        str "This service uses the targetP under the hood."
+                        br []
+                        br []
+                        str "For more information about targetP, head "
+                        a [Props.Href "http://www.cbs.dtu.dk/services/TargetP/"] [str "here"]
+                    ]
+                    Column.column [] [
+                        str "Verion 0.1.0."
+                        br []
+                        br []
+                        str " This service is developed and maintained by the "
+                        a [Props.Href ""] [str "Computational Systems Biology department "]
+                        str "of the TU Kaiserslautern, Germany."
+                        br []
+                        br []
+                        a [Props.Href ""] [str "SourceCode available here"]
                     ]
                 ]
             ]            

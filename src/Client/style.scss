@@ -1,6 +1,5 @@
 
 body {
-    font-family: "Lora",Times,serif;
     overflow-y : auto;
     background-image: url("/Images/CircuitBrain.jpg");
     background-repeat: no-repeat;
@@ -9,27 +8,65 @@ body {
     background-position: center;
 
 }
+
+p.is-danger {
+    color: red;
+    font-weight:bold;
+    font-size: 1.25rem;
+}
+
 .navbar.is-dark.csbNav{
     background-color: rgb(68,84,106);
 }
 
-.hero.csbHero{
-/* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#ed7d31+0,faee05+100 */
+a.navbar-item.is-active {
+    background-color: rgb(222, 235, 247) !important;
+    color: rgb(68,84,106) !important;
+}
+
+.HelpSection {
+    background-color: rgb(222, 235, 247);
+    color: rgb(68,84,106);
+}
+
+.HelpSection .fas {
+    color: darkred;
+    cursor:pointer;
+}
+
+.hero.csbHero {
+    /* Permalink - use to edit and share this gradient: http://colorzilla.com/gradient-editor/#ed7d31+0,faee05+100 */
     background: #ed7d31;
     background: -moz-linear-gradient(-55deg, #ed7d31 0%, #fad505 80%);
     background: -webkit-linear-gradient(-55deg, #ed7d31 0%,#fad505 100%);
-    background: linear-gradient(145deg, rgba(237, 125, 49, 0.8) 0%,rgba(250, 238, 5, 0.8) 100%);
+    background: linear-gradient(145deg, rgba(237, 125, 49, 0.9) 0%,rgba(250, 238, 5, 0.9) 100%);
     filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ed7d31', endColorstr='#faee05',GradientType=1 );
+    text-align: justify;
 }
 
-.section.csbSection{
-    background-color : rgb(222, 235, 247, 0.8);
-    opacity : 0.6;
+.textarea {
+    border-color: rgb(237, 125, 49);
+}
 
+.is-danger-CSB {
+    background-color: rgb(250, 238, 5) !important
+}
+
+.startBtn {
+    min-height: 120px;
+}
+
+.section.csbSection {
+    background-color: rgb(222, 235, 247, 0.8);
+    opacity: 0.6;
 }
 
 .section.resultSection {
-    background-color: rgb(222, 235, 247, 0.8);
+    background: rgba(222,235,247,0.95);
+}
+
+.section.resultSection hr {
+    background:rgb(68,84,106)
 }
 
 .ProcessDecision {
@@ -37,15 +74,25 @@ body {
     /*margin: 0 0 0 0;*/
 }
 
+.ProcessDecision .column {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
 .tile.csbTile {
     border: 1px solid rgb(68,84,106);
 }
 
 .ResultFrame {
-    min-height: 600px;
-    min-width: 600px;
+    min-height: 800px;
+    min-width: 800px;
     width: 100%;
     overflow: hidden;
+}
+
+.plot-container {
+    width: 50% !important;
+    margin: auto !important;
 }
 
 .transparent {
@@ -56,7 +103,23 @@ body {
     word-wrap: break-word;
 }
 
-.fastaDisplay span{
+.viewManipulator {
+    display: flex;
+    align-items: center;
+    font-size: 2rem;
+    font-weight:bold
+}
+
+.viewManipulator:hover {
+    background-color:lightgray;
+    cursor:pointer;
+}
+
+.viewManipulator div {
+    width:100%;
+}
+
+.fastaDisplay span {
     font-family: Consolas,monaco,monospace;
     font-size: 1.25em;
     line-height: 100%;
@@ -65,8 +128,16 @@ body {
 }
 
 .leftSelector {
-    background-color: rgba(222, 235, 247, 0.9);
-    text-align:right;
+    background-color: rgba(256, 256, 256, 1.0);
+    text-align: right;
+}
+
+.leftSelector .title {
+    color: rgb(237, 125, 49)
+}
+
+.leftSelector hr {
+    background-color: rgb(237, 125, 49)
 }
 
 .leftAlternative {
@@ -78,22 +149,126 @@ body {
     background-color: rgb(68,84,106);
 }
 
-.rightSelector .title {
-    color: white;
-}
 .rightSelector {
-    background-color: rgba(68,84,106, 0.9);
+    background-color: rgba(68,84,106, 0.95);
     text-align: left;
 
 }
+.rightSelector .title {
+    color: rgb(237, 125, 49)
+}
+
+.rightSelector hr {
+    background-color: rgb(237, 125, 49)
+}
+
+.rightSelector .radio {
+    color: rgb(237, 125, 49);
+    font-size: 1.25rem;
+}
+
+.fastaFileUploadBtn {
+    border: 1px solid rgb(237, 125, 49);
+    background-color: rgb(256, 256, 256);
+    color: rgb(237, 125, 49)
+}
+
+.fastaFileUploadBtn .title {
+    color: rgb(237, 125, 49);
+}
+
+.file-label:hover .file-cta {
+    background-color: rgb(237, 125, 49);
+    color: white;
+}
+.file-label:hover .title {
+    color: rgb(222, 235, 247);
+}
+
+#ResultHeading {
+    background: rgba(222,235,247,0.95);
+    margin-bottom: 0 !important;
+}
+
+#ResultHeading .column {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+#ResultHeading .title {
+    color: rgb(68,84,106);
+}
+
+#ResultHeading .pagination-link {
+    color: rgb(68,84,106);
+    border-color: rgb(68,84,106);
+    background-color: rgb(237, 125, 49);
+}
+
+#ResultHeading .pagination-link.is-current {
+    border-color: rgb(237, 125, 49);
+    background-color: rgb(68,84,106);
+    color: rgb(237, 125, 49);
+}
+
+#ResultHeading hr {
+    background-color: rgb(68,84,106);
+}
+
+.leftResultHeading {
+    text-align: right;
+}
+
+.resultBar {
+    background: #ed7d31;
+    background: -moz-linear-gradient(-55deg, #ed7d31 0%, #fad505 80%);
+    background: -webkit-linear-gradient(-55deg, #ed7d31 0%,#fad505 100%);
+    background: linear-gradient(145deg, rgba(237, 125, 49, 1.0) 0%,rgba(250, 238, 5, 1.0) 100%);
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ed7d31', endColorstr='#faee05',GradientType=1 );
+    margin-bottom: 0 !important;
+    position:fixed;
+    bottom:0px;
+    z-index:29;
+    width: 100%;
+}
+
+.resultBar .column {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+.resultBar.title, .resultBar .pagination-link {
+    color: rgb(68,84,106);
+}
+
+.resultBar .pagination-link {
+    border-color: rgb(68,84,106);
+    background-color: rgb(237, 125, 49);
+}
+
+.resultBar .pagination-link.is-current {
+    border-color: rgb(237, 125, 49);
+    background-color: rgb(68,84,106);
+    color: rgb(237, 125, 49);
+}
+
+.resultBar hr {
+    background-color: rgb(68,84,106);
+}
+
+
+.leftResultBar {
+    text-align:right;
+}
+
 
 a[download] {
     font-size: 1.5em;
-    line-height: 100%;
     background-color: #22c65b;
     border-color: transparent;
     color: #fff;
-    text-decoration: underline;
+    width:100%;
+    height:100%;
 }
 
 a[download]::before{

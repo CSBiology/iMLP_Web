@@ -12,3 +12,5 @@ release.sh
 .idea/
 *.DotSettings.user
 deploy
+/src/Client/public/BulmaJS-master
+/src/Server/tmp
