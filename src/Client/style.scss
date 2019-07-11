@@ -27,6 +27,10 @@ a.navbar-item.is-active {
 .HelpSection {
     background-color: rgb(222, 235, 247);
     color: rgb(68,84,106);
+    width: 100%;
+    border: 1px solid;
+    position: fixed;
+    z-index: 28;
 }
 
 .HelpSection .fas {

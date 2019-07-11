@@ -186,12 +186,19 @@ let targetPApi = {
                         |> Async.RunSynchronously
 
                 //read fasta item from input
-                let fastA = 
-                    single
-                    |> fun x -> x.Replace("\r\n","\n")
-                    |> String.split '\n'
-                    |> FastA.fromFileEnumerator id
-                    |> Array.ofSeq
+                let fastA =
+                    if single.StartsWith(">") then
+                        single
+                        |> fun x -> x.Replace("\r\n","\n")
+                        |> String.split '\n'
+                        |> FastA.fromFileEnumerator id
+                        |> Array.ofSeq
+                    else
+                        sprintf ">No Header Provided\n%s" single
+                        |> fun x -> x.Replace("\r\n","\n")
+                        |> String.split '\n'
+                        |> FastA.fromFileEnumerator id
+                        |> Array.ofSeq
 
                 //Save fasta to temporary container path
                 let tmpPath = (sprintf @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString()))
@@ -217,6 +224,7 @@ let targetPApi = {
                 //return result
                 let propensity = Propensity.ofWindowed 3 scores
                 let propensityPlot = PlotHelpers.plotFromScores 1 propensity
+
                 return {   
                         Header      =   header
                         Sequence    =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
@@ -225,52 +233,7 @@ let targetPApi = {
                         PlotHtml    =   propensityPlot
                         }
             }
-    //FastaFileRequest = 
-    //    fun model file -> 
-    //        async {
-    //            let targetModel = 
-    //                match model with
-    //                |Plant      -> TargetP.Plant
-    //                |NonPlant   -> TargetP.NonPlant
-    //                |_          -> failwithf "No model for targetP provided"
-    //            let client = Docker.connect "npipe://./pipe/docker_engine"
-    //            let tpContext = 
-    //                BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\schneike\Desktop\TargetPTest"
-    //                |> Async.RunSynchronously
-    //            printfn "bc context running"
-    //            let fastA = 
-    //                file
-    //                |> fun x -> x.Replace("\r\n","\n")
-    //                |> String.split '\n'
-    //                |> FastA.fromFileEnumerator id
-    //                |> Array.ofSeq
-    //            let results =
-    //                fastA
-    //                |> Array.mapi (fun i fastaItem -> 
-    //                                let header = fastaItem.Header
-    //                                let sequences = fastaItem |> singleSequenceToMany
-    //                                let tmpPath = (sprintf @"C:\Users\schneike\Desktop\TargetPTest\%s.fsa" (System.Guid.NewGuid().ToString()))
-    //                                sequences
-    //                                |> FastA.write id tmpPath
-    //                                //printfn "inputSequences: \n %A" sequences 
-    //                                printfn "starting targetP task"
-    //                                let scores = 
-    //                                    try 
-    //                                        TargetPServer.runWithMount tpContext targetModel tmpPath
-    //                                        |> Seq.map (fun x -> x.Mtp)
-    //                                        |> Array.ofSeq
-    //                                    with e as exn ->    printfn "%s" e.Message
-    //                                                        [||]
-    //                                let plot = plotFromScores i scores
-    //                                {   
-    //                                    Header      =   header
-    //                                    Sequence    =   new System.String (fastaItem.Sequence |> Array.ofSeq)
-    //                                    Scores      =   scores
-    //                                    PlotHtml    =   plot
-    //                                })
-    //            printfn "targetP done."
-    //            return results
-    //        }
+
     DownloadRequestSingle = 
         fun (res,id)-> 
             async { 

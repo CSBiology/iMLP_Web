@@ -182,29 +182,33 @@ type Model = {
     HasJobRunning               :   bool
     ShowProgressDetails         :   bool
     InformationSectionDisplay   :   DisplayHelp
+    HasError                    :   bool
+    ErrorState                  :   exn Option
 }
 
 let initialModel = {
-    SessionGuid              =   System.Guid.NewGuid()
-    BurgerVisible            =   false
-    SelectedTargetPModel     =   TargetPModel.NoModel
-    SingleSequence           =   ""
-    SingleSequenceResult     =   None
-    FastaFileInput           =   [||]
-    FastaFileInputName       =   "No file selected"
-    FastaFileInputResult     =   None
-    SeqMode                  =   Mode.NotSelected
-    ShowResults              =   false
-    ResultHeadingIsSticky    =   false
-    CurrentResultViewIndex   =   0
-    DownloadReady            =   false
-    DownloadFileName         =   "IMTS_prediction_results.tsv"
-    FileProcessIndex         =   0
-    HasValidFasta            =   true
-    InvalidFastaChars        =   []
-    HasJobRunning            =   false
-    ShowProgressDetails      =   false
-    InformationSectionDisplay=   NoHelp
+    SessionGuid                 =   System.Guid.NewGuid()
+    BurgerVisible               =   false
+    SelectedTargetPModel        =   TargetPModel.NoModel
+    SingleSequence              =   ""
+    SingleSequenceResult        =   None
+    FastaFileInput              =   [||]
+    FastaFileInputName          =   "No file selected"
+    FastaFileInputResult        =   None
+    SeqMode                     =   Mode.NotSelected
+    ShowResults                 =   false
+    ResultHeadingIsSticky       =   false
+    CurrentResultViewIndex      =   0
+    DownloadReady               =   false
+    DownloadFileName            =   "IMTS_prediction_results.tsv"
+    FileProcessIndex            =   0
+    HasValidFasta               =   true
+    InvalidFastaChars           =   []
+    HasJobRunning               =   false
+    ShowProgressDetails         =   false
+    InformationSectionDisplay   =   NoHelp
+    HasError                    =   false
+    ErrorState                  =   None
 }
 
 // The Msg type defines what events/actions can occur while the application is running
@@ -262,6 +266,9 @@ let init () : Model * Cmd<Msg> =
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | Reset -> init ()
+    | GenericError exn ->
+        let updatedModel = {currentModel with HasError = true; ErrorState=Some exn}
+        updatedModel,Cmd.none
     | ChangeHelpDisplay hd ->
         let updatedModel = {currentModel with InformationSectionDisplay = hd}
         updatedModel,Cmd.none
@@ -1138,52 +1145,68 @@ let hero (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
-let view (model : Model) (dispatch : Msg -> unit) =
-
-    div [][
-        navbar model dispatch
-        displayHelpSection model dispatch
-        hero model dispatch
-        inputSelection model dispatch
-        resultHeading model dispatch (match model.FastaFileInputResult with |Some r -> r | _ -> [||])
-        resultSection model dispatch
-        Footer.footer [] [
-            Container.container [] [
-                Columns.columns [] [
-                    Column.column [] [
-                        
-                        str "built with <3,"
-                        ul [] [
-                            br []
-                            li [Props.Href "" ] [a [] [str "F#"; str","]]
-                            br []
-                            li [Props.Href "" ] [a [] [str "BioFSharp"]; str","]
-                            br []
-                            li [Props.Href "" ] [str "and ";a [] [str "SAFE Stack"]]
-                        ] 
-                    ]
-                    Column.column [] [
-                        str "This service uses the targetP under the hood."
-                        br []
-                        br []
-                        str "For more information about targetP, head "
-                        a [Props.Href "http://www.cbs.dtu.dk/services/TargetP/"] [str "here"]
-                    ]
-                    Column.column [] [
-                        str "Verion 0.1.0."
-                        br []
-                        br []
-                        str " This service is developed and maintained by the "
-                        a [Props.Href ""] [str "Computational Systems Biology department "]
-                        str "of the TU Kaiserslautern, Germany."
-                        br []
-                        br []
-                        a [Props.Href ""] [str "SourceCode available here"]
-                    ]
-                ]
-            ]            
+let errorDisplay (model : Model) (dispatch : Msg -> unit) =
+    let msg,stackTrace =
+        match model.ErrorState with
+        | Some ex   -> ex.Message,ex.StackTrace
+        | None      -> "Unexpected Error","App failed without Exception message"
+    Section.section [Section.CustomClass "is-danger"] [
+        Heading.h1 [] [str "An error occured. You can see the error message below.. Click this button below to reset the app state:"]
+        Button.button [Button.CustomClass "is-danger";Button.OnClick (fun _ -> Reset |> dispatch)] []
+        Content.content [] [
+            Heading.h3 [] [str msg]
+            Heading.h4 [] [str stackTrace]
         ]
     ]
+
+let view (model : Model) (dispatch : Msg -> unit) =
+    if model.HasError then
+        errorDisplay model dispatch
+    else
+        div [][
+            navbar model dispatch
+            displayHelpSection model dispatch
+            hero model dispatch
+            inputSelection model dispatch
+            resultHeading model dispatch (match model.FastaFileInputResult with |Some r -> r | _ -> [||])
+            resultSection model dispatch
+            Footer.footer [] [
+                Container.container [] [
+                    Columns.columns [] [
+                        Column.column [] [
+                        
+                            str "built with <3,"
+                            ul [] [
+                                br []
+                                li [Props.Href "" ] [a [] [str "F#"; str","]]
+                                br []
+                                li [Props.Href "" ] [a [] [str "BioFSharp"]; str","]
+                                br []
+                                li [Props.Href "" ] [str "and ";a [] [str "SAFE Stack"]]
+                            ] 
+                        ]
+                        Column.column [] [
+                            str "This service uses the targetP under the hood."
+                            br []
+                            br []
+                            str "For more information about targetP, head "
+                            a [Props.Href "http://www.cbs.dtu.dk/services/TargetP/"] [str "here"]
+                        ]
+                        Column.column [] [
+                            str "Verion 0.1.0."
+                            br []
+                            br []
+                            str " This service is developed and maintained by the "
+                            a [Props.Href ""] [str "Computational Systems Biology department "]
+                            str "of the TU Kaiserslautern, Germany."
+                            br []
+                            br []
+                            a [Props.Href ""] [str "SourceCode available here"]
+                        ]
+                    ]
+                ]            
+            ]
+        ]
 
 #if DEBUG
 open Elmish.Debug
