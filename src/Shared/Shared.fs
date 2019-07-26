@@ -13,11 +13,12 @@ type TargetPModel =
 |NonPlant
 
 type TargetPResult = {
-    Header      : string
-    Sequence    : string
-    Scores      : float array
-    Propensity  : float array
-    PlotHtml    : string
+    Header              : string
+    Sequence            : string
+    Scores              : float array
+    Propensity          : float array
+    PropensityPlotHtml  : string
+    ScorePlotHtml       : string
 }
 
 /// A type that specifies the communication protocol between client and server

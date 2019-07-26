@@ -303,3 +303,41 @@ a[download]:focus{
 .is-selected-model {
     border: 2px solid green;
 }
+
+.ErrorSection {
+    background-color: rgba( 240, 128, 128, 0.9);
+}
+
+.ErrorSection h1 {
+    color: red
+
+}
+
+.resetBtn {
+    width: 100%;
+    min-height: 7rem;
+    font-size: 3rem;
+}
+
+.plotModeBtnActive {
+    border-color: rgb(237, 125, 49);
+    background-color: rgb(68,84,106);
+    color: rgb(237, 125, 49);
+}
+.plotModeBtnActive:focus {
+    border-color: rgb(237, 125, 49) !important;
+    background-color: rgb(68,84,106) !important;
+    color: rgb(237, 125, 49) !important;
+}
+
+.plotModeBtnInactive {
+    border: none ;
+    background-color: whitesmoke !important;
+    color: rgb(68,84,106) !important;
+}
+
+.plotModeBtnInactive:hover {
+    border: 1px solid rgb(68,84,106) !important;
+    background-color: rgb(222, 235, 247) !important;
+    color: rgb(68,84,106) !important;
+}

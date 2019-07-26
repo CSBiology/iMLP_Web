@@ -154,11 +154,15 @@ type Mode =
 
 type DisplayHelp =
 |NoHelp
-|FAQ
+|TechnicalDetails
 |Contact
 |HowToUse
 |Publication
 |InputFormat
+
+type PlotMode =
+|Propensity
+|TargetPScore
 
 // The model holds data that you want to keep track of while the application is running
 type Model = { 
@@ -184,12 +188,13 @@ type Model = {
     InformationSectionDisplay   :   DisplayHelp
     HasError                    :   bool
     ErrorState                  :   exn Option
+    PlotMode                    :   PlotMode
 }
 
 let initialModel = {
     SessionGuid                 =   System.Guid.NewGuid()
     BurgerVisible               =   false
-    SelectedTargetPModel        =   TargetPModel.NoModel
+    SelectedTargetPModel        =   TargetPModel.NonPlant
     SingleSequence              =   ""
     SingleSequenceResult        =   None
     FastaFileInput              =   [||]
@@ -209,6 +214,7 @@ let initialModel = {
     InformationSectionDisplay   =   NoHelp
     HasError                    =   false
     ErrorState                  =   None
+    PlotMode                    =   Propensity
 }
 
 // The Msg type defines what events/actions can occur while the application is running
@@ -235,6 +241,7 @@ type Msg =
 | ChangeHelpDisplay         of DisplayHelp
 | FastaValidation           of Result<string,char list>
 | GenericError              of exn
+| ChangePlotMode            of PlotMode
 
 let gradientColorTable = [|
     "#FAEE05"
@@ -268,6 +275,9 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | Reset -> init ()
     | GenericError exn ->
         let updatedModel = {currentModel with HasError = true; ErrorState=Some exn}
+        updatedModel,Cmd.none
+    | ChangePlotMode pm ->
+        let updatedModel = {currentModel with PlotMode = pm}
         updatedModel,Cmd.none
     | ChangeHelpDisplay hd ->
         let updatedModel = {currentModel with InformationSectionDisplay = hd}
@@ -389,9 +399,8 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         updatedModel,Cmd.none
 
     | SingleSequenceResponse (Error res) ->
-        console.log("ERROROROROROROROROROOROROOROROR")
         console.log(res)
-        currentModel,Cmd.none
+        currentModel,Cmd.ofMsg (GenericError res)
 
     | FastaUploadResponse (Ok res) ->
         let updatedModel = {
@@ -408,7 +417,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | FastaUploadResponse (Error res) ->
         //TODO: handle request error!
         console.log(res)
-        currentModel,Cmd.none
+        currentModel,Cmd.ofMsg (GenericError res)
 
     | ToggleResultHeadingSticky state ->
         let updatedModel = {currentModel with ResultHeadingIsSticky = state}
@@ -458,7 +467,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
 
     | DownloadResponse (Error ex) ->
         let updatedModel = {currentModel with DownloadReady = false}
-        updatedModel,Cmd.none
+        updatedModel,Cmd.ofMsg (GenericError ex)
 
     | DownloadFileNameChange dname ->
         let updatedModel = {currentModel with DownloadFileName = dname}
@@ -507,16 +516,17 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
                         Navbar.Item.IsActive (currentDisp = InputFormat)
                     ] [
                     str "Input format"
+
+                ]
+                Navbar.Item.a
+                    [
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = TechnicalDetails then NoHelp else TechnicalDetails) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = TechnicalDetails)
+                    ] [
+                    str "Technical details"
                 ]
             ]
             Navbar.End.div [] [
-                Navbar.Item.a
-                    [
-                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = FAQ then NoHelp else FAQ) |> dispatch)]
-                        Navbar.Item.IsActive (currentDisp = FAQ)
-                    ] [
-                    str "FAQ"
-                ]
                 Navbar.Item.a
                     [
                         Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = Contact then NoHelp else Contact) |> dispatch)]
@@ -532,12 +542,20 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     
     match model.InformationSectionDisplay with
     |NoHelp         -> []
-    |FAQ            ->
+    |TechnicalDetails ->
         [
             br []
-            Heading.h4 [] [str "FAQ   "]; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]
+            Heading.h4 [] [str "Technical Details   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
             br []
-            str "None collected yet"
+            str "This service uses a server-side nested virtualization procedure to enable querying a targetP docker container."
+            br []
+            br []
+            str "Nested in this case means that the host machine, which itself is a windows server virtual machine running on a HyperV cluster acts itself as a host for the docker demon."
+            br []
+            str "This enables the realisation of OS-agnostic services, here the calling of targetP - a command line tool usually only available to unix host machines."
+            br []
+            br []
+            str "We designed a F# library - BioFSharp.BioTools - to reliably run docker tasks from the .NET environment, therefore making dockerized non-windows applications available for the .NET ecosystem."
         ]
     |Contact        ->
         [
@@ -577,7 +595,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             br []
             str "Fasta conform means:"
             ul [] [
-                li [] [str "each protein sequence is headed by a single line identifying header, started by the '>' character"]
+                li [] [str "each protein sequence is headed by a single line identifying header, started by the '>' character. In the case of a single sequence input the header can be omitted."]
                 li [] [str "The sequence starts in the next line and only consist of valid amino acid characters (ACDEFGHIKLMNOPQRSTUVWY)"]
                 li [] [str "Ambiguity characters (XJZB) are okay"]
                 li [] [str "Gap and terminator characters (- and *) are filtered out by us. Just keep this in mind when you look at your profiles."]
@@ -617,12 +635,21 @@ let pageinateDynamic (pos: int) (res: TargetPResult array) (model:Model) (dispat
         |> List.map (fun index -> pageinateFromIndex res index model dispatch) 
     numbers 
 
-let fastaFormatDisplay (sequence:char array) (scores: float array) =
+let fastaFormatDisplay (model:Model) (sequence:char array) (scores: float array) =
     console.log(sequence |> Seq.fold (fun a x -> sprintf "%s%c" a x) "")
     console.log(scores)
-    let maxVal = Array.max scores
+    let scores' =
+        if model.PlotMode = Propensity then
+            scores
+            |> fun x ->
+                let minVal = Array.min x
+                x
+                |> Array.map (fun x -> x + (abs minVal))
+        else
+            scores
+    let maxVal = Array.max scores'
     let norm = 
-        scores
+        scores'
         |> Array.map (fun s -> s/maxVal)
         |> fun x ->
             console.log(sprintf "score length: %i" x.Length)
@@ -756,7 +783,6 @@ let progressView (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
             yield progress [Class "progress is-link is-large"; Props.Value progr] [str (sprintf "%.2f%s" (float model.FileProcessIndex / float model.FastaFileInput.Length) "%")]
     ]
 
-
 let resultBar (model : Model) (res: TargetPResult [] ) (dispatch : Msg -> unit) =
     let index = model.CurrentResultViewIndex
     div
@@ -846,19 +872,59 @@ let resultHeading (model:Model) (dispatch: Msg -> unit)  (res: TargetPResult [] 
         ]
     ]
 
+let plotModeSwitch (model : Model) (dispatch: Msg -> unit) =
+    Level.level [] [
+        Level.left [] [
+            Button.button [
+                yield Button.IsFullWidth
+                if model.PlotMode = Propensity then
+                    yield Button.CustomClass "plotModeBtnActive"
+                else
+                    yield Button.CustomClass "plotModeBtnInactive"
+                yield Button.OnClick (fun _ -> ChangePlotMode Propensity |> dispatch)
+            ] [
+                str "Plot iMTS-L propensity"
+            ]
+            Button.button [
+                yield Button.IsFullWidth
+                if model.PlotMode = TargetPScore then
+                    yield Button.CustomClass "plotModeBtnActive"
+                else
+                    yield Button.CustomClass "plotModeBtnInactive"
+                yield Button.OnClick (fun _ -> ChangePlotMode TargetPScore |> dispatch)
+            ] [
+                str "Plot raw TargetP score"
+            ]
+        ]
+        Level.right [] [
+        ]
+    ]
+
 let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
     Columns.columns [Columns.IsCentered] [
         Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
         Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
             br []
             Heading.h4 [] [str res.Header]
+            plotModeSwitch model dispatch
             hr []
-            Heading.h4 [] [str "Sequence score heatmap:"]
-            fastaFormatDisplay (res.Sequence.ToCharArray()) res.Scores
+            Heading.h4 [] [
+                if model.PlotMode = Propensity then
+                    yield str "iMTS-L propensity heatmap:"
+                else
+                    yield str "Raw TargetP sequence score heatmap:"
+            ]
+            fastaFormatDisplay model (res.Sequence.ToCharArray()) (if model.PlotMode = Propensity then res.Propensity else res.Scores)
             hr []
             Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
             iframe [
-                Props.SrcDoc (res.PlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
+                Props.SrcDoc
+                    (
+                        if model.PlotMode = Propensity then
+                            res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                        else
+                            res.ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                    )
                 Props.Class "ResultFrame"
                 Props.Scrolling "no"]
                 [
@@ -873,11 +939,11 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
         Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
     ]
 
-
 let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult array) =
     let index = model.CurrentResultViewIndex
     let sequence = res.[index].Sequence 
     let scores = res.[index].Scores
+    let propensity = res.[index].Propensity
     let progr = (float model.FileProcessIndex / float model.FastaFileInput.Length)
     Columns.columns [Columns.IsCentered] [
         Column.column
@@ -891,13 +957,20 @@ let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult 
         Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
             br []
             Heading.h4 [] [str res.[index].Header]
+            plotModeSwitch model dispatch
             hr []
             Heading.h4 [] [str "Sequence score heatmap:"]
-            fastaFormatDisplay (sequence.ToCharArray()) scores
+            fastaFormatDisplay model (sequence.ToCharArray()) (if model.PlotMode = Propensity then propensity else scores)
             hr []
             Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
             iframe [
-                Props.SrcDoc (res.[index].PlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
+                Props.SrcDoc
+                    (
+                        if model.PlotMode = Propensity then
+                            res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                        else
+                            res.[index].ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") 
+                    )
                 Props.Class "ResultFrame"
                 Props.Scrolling "no"]
                 [
@@ -919,9 +992,6 @@ let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult 
             ]
     ]
 
-
-    
-
 let resultSection (model : Model) (dispatch: Msg -> unit) =
     Section.section [
                         if model.ShowResults = false then yield Section.Props [Props.Style [Props.Display DisplayOptions.None]] 
@@ -936,7 +1006,6 @@ let resultSection (model : Model) (dispatch: Msg -> unit) =
             |Some res -> yield multipleResults model dispatch res
             |None -> ()
     ]
-
 
 let validateInputState (model:Model) =
     match model.SeqMode with
@@ -957,8 +1026,6 @@ let validateInputState (model:Model) =
                                 | true -> true,"Start computation"
                                 | false -> false, "Fasta is invalid"
     |_ -> false,"No data provided"
-
-
 
 let targetPModelSelector (isTargetSelector: bool) (model : Model) (dispatch : Msg -> unit) =
     
@@ -1098,10 +1165,12 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                             Radio.radio [] [
                                 Radio.input
                                     [
-                                        Radio.Input.Name "ModelSelection"
-                                        Radio.Input.Props [OnClick (fun _ -> TargetPModelSelection TargetPModel.NonPlant |> dispatch)]
+                                        if model.SelectedTargetPModel = NonPlant then
+                                            yield Radio.Input.Props [Checked true]
+                                        yield Radio.Input.Name "ModelSelection"
+                                        yield Radio.Input.Props [OnClick (fun _ -> TargetPModelSelection TargetPModel.NonPlant |> dispatch)]
                                     ]
-                                b [] [str "Non-Plant"]
+                                b [] [str "Non-Plant (default)"]
                             ]
                             Radio.radio [] [
                                 Radio.input
@@ -1120,7 +1189,6 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
             ]
         ]
     ]
-
 
 let hero (model : Model) (dispatch : Msg -> unit) =
     Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
@@ -1148,14 +1216,28 @@ let hero (model : Model) (dispatch : Msg -> unit) =
 let errorDisplay (model : Model) (dispatch : Msg -> unit) =
     let msg,stackTrace =
         match model.ErrorState with
-        | Some ex   -> ex.Message,ex.StackTrace
+        | Some ex  -> match ex with
+                      | :? Fable.Remoting.Client.ProxyRequestException as fe -> fe.Message, fe.ResponseText
+                      | _ -> ex.Message,ex.StackTrace
         | None      -> "Unexpected Error","App failed without Exception message"
-    Section.section [Section.CustomClass "is-danger"] [
-        Heading.h1 [] [str "An error occured. You can see the error message below.. Click this button below to reset the app state:"]
-        Button.button [Button.CustomClass "is-danger";Button.OnClick (fun _ -> Reset |> dispatch)] []
+    Section.section [Section.CustomClass "ErrorSection"] [
+        Heading.h1 []
+            [
+            Icon.icon [Icon.IsRight; Icon.Size IsLarge] [Fa.i [Fa.Solid.SkullCrossbones] []]
+            str "Oopsie!"
+            Icon.icon [Icon.IsRight; Icon.Size IsLarge] [Fa.i [Fa.Solid.SkullCrossbones] []]
+            ]
+
+        Heading.h2 [] [str "An error occured. Click the button below to reset the app state:"]
+        Button.button [Button.CustomClass "is-danger resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
+        br []
+        br []
+        Heading.h3 [] [str "If you are a developer and/or interested in the stack trace you can see the error message below."]
+        br []
         Content.content [] [
             Heading.h3 [] [str msg]
-            Heading.h4 [] [str stackTrace]
+            Heading.h3 [] [str "StackTrace:"]
+            Heading.h5 [] [str stackTrace]
         ]
     ]
 

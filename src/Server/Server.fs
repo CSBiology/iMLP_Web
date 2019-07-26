@@ -24,7 +24,6 @@ open BioFSharp.BioTools
 open FSharpAux
 open Suave.Logging
 
-
 module Propensity =
     open FSharp.Stats
 
@@ -88,7 +87,7 @@ module PlotHelpers =
 
     let csbOrange = FSharpAux.Colors.fromRgb 237 125 49
 
-    let plotFromScores (index:int) (scores: float array) = 
+    let plotFromScores (name:string) (scores: float array) = 
         let vals = 
             scores
             |> Array.mapi (fun i x -> (i+1,x)) 
@@ -101,7 +100,7 @@ module PlotHelpers =
             |> Chart.Combine
             |> Chart.withY_Axis(xAxis "Score")
             |> Chart.withX_Axis(yAxis "Index of AminoAcid")
-            |> Chart.withTitle("iMTS-L propensity")
+            |> Chart.withTitle(sprintf "%s" name)
             |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
             |> Chart.withSize(600.,600.)
 
@@ -222,15 +221,17 @@ let targetPApi = {
                 File.Delete(tmpPath)
 
                 //return result
+                let scorePlot = PlotHelpers.plotFromScores "Raw TargetP Scores" scores
                 let propensity = Propensity.ofWindowed 3 scores
-                let propensityPlot = PlotHelpers.plotFromScores 1 propensity
+                let propensityPlot = PlotHelpers.plotFromScores "iMTS-L propensity" propensity
 
                 return {   
-                        Header      =   header
-                        Sequence    =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
-                        Scores      =   scores
-                        Propensity  =   propensity
-                        PlotHtml    =   propensityPlot
+                        Header              =   header
+                        Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
+                        Scores              =   scores
+                        Propensity          =   propensity
+                        PropensityPlotHtml  =   propensityPlot
+                        ScorePlotHtml       =   scorePlot
                         }
             }
 
@@ -262,7 +263,7 @@ let errorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) : ErrorResu
     printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
     // decide whether or not you want to propagate the error to the client
     match ex with
-    | _ ->  Propagate {errorMsg = (sprintf "%s \r\n %A" ex.Message ex.StackTrace)}
+    | _ ->  Propagate ex
 
 let webApi =
     Remoting.createApi()
