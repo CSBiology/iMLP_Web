@@ -166,6 +166,9 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
         yield
             FastA.createFastaItem (sprintf ">%s" header) (Seq.skip i sequence) 
             ]
+    //targetP fails on Sequences longer than 1200 amino acids, so be safe and split sequences in 1000 item sized chunks
+    |> Seq.chunkBySize 1000
+
 
 let targetPApi = {
     SingleSequenceRequest = 
@@ -181,7 +184,7 @@ let targetPApi = {
 
                 let client = Docker.connect "npipe://./pipe/docker_engine"
                 let tpContext = 
-                        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp"
+                        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src\Server\tmp"
                         |> Async.RunSynchronously
 
                 //read fasta item from input
@@ -198,19 +201,35 @@ let targetPApi = {
                         |> String.split '\n'
                         |> FastA.fromFileEnumerator id
                         |> Array.ofSeq
+                         
+                let header = fastA.[0].Header
 
                 //Save fasta to temporary container path
-                let tmpPath = (sprintf @"C:\Users\Kevin\source\repos\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString()))
-                fastA.[0]
-                |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
-                |> singleSequenceToMany
-                |> FastA.write id tmpPath
+                let splitSeqs =
+                    fastA.[0]
+                        |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
+                        |> singleSequenceToMany
+
+                let paths =
+                    [|for i in splitSeqs -> System.Threading.Thread.Sleep 10; sprintf @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())|]
+
+                splitSeqs
+                |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
+
+                let scores =
+                    paths
+                    |> Seq.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
+                    |> Seq.map (fun x -> x |> Seq.map (fun y -> y.Mtp))
+                    |> Seq.concat
+                    |> Array.ofSeq
 
                 //Run Biocontainer
-                let header = fastA.[0].Header
+
                 let scores = 
-                    TargetPServer.runWithMount tpContext targetModel tmpPath
-                    |> Seq.map (fun x -> x.Mtp)
+                    paths
+                    |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
+                    |> Array.map (fun tpres ->tpres |>  Seq.map (fun x -> x.Mtp))
+                    |> Seq.concat
                     |> Array.ofSeq
 
                 //Cleanup
@@ -218,7 +237,7 @@ let targetPApi = {
                 BioContainer.disposeAsync tpContext
                 |> Async.RunSynchronously
                 //delete temporary file
-                File.Delete(tmpPath)
+                paths |> Array.iter File.Delete
 
                 //return result
                 let scorePlot = PlotHelpers.plotFromScores "Raw TargetP Scores" scores
@@ -233,6 +252,9 @@ let targetPApi = {
                         PropensityPlotHtml  =   propensityPlot
                         ScorePlotHtml       =   scorePlot
                         }
+                
+
+                        
             }
 
     DownloadRequestSingle = 
@@ -277,6 +299,7 @@ let webApp =
     choose [
         webApi
         path "/" >=> browseFileHome "index.html"
+        pathScan "/api/downloadResults/%s" (fun fileName -> Successful.OK fileName)
         browseHome
         RequestErrors.NOT_FOUND "Not found!"
     ]

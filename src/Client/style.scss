@@ -75,7 +75,8 @@ a.navbar-item.is-active {
 
 .ProcessDecision {
     /*background-color: #fafafa;*/
-    /*margin: 0 0 0 0;*/
+
+    margin: 0 0 0 0;
 }
 
 .ProcessDecision .column {
@@ -123,6 +124,7 @@ a.navbar-item.is-active {
     width:100%;
 }
 
+
 .fastaDisplay span {
     font-family: Consolas,monaco,monospace;
     font-size: 1.25em;
@@ -133,6 +135,13 @@ a.navbar-item.is-active {
 
 .leftSelector {
     background-color: rgba(256, 256, 256, 1.0);
+
+    @supports (backdrop-filter: blur(3px)) or (--webkit-backdrop-filter: blur(3px)) {
+        -webkit-backdrop-filter: blur(5px);
+        backdrop-filter: blur(5px);
+        background-color: rgba(256, 256, 256, 0.85);
+    }
+
     text-align: right;
 }
 
@@ -155,11 +164,17 @@ a.navbar-item.is-active {
 
 .rightSelector {
     background-color: rgba(68,84,106, 0.95);
-    text-align: left;
 
+    @supports (backdrop-filter: blur(3px)) or (--webkit-backdrop-filter: blur(3px)) {
+        -webkit-backdrop-filter: blur(5px);
+        backdrop-filter: blur(5px);
+        background-color: rgba(68,84,106, 0.85);
+    }
+    text-align: left;
 }
 .rightSelector .title {
     color: rgb(237, 125, 49)
+
 }
 
 .rightSelector hr {
