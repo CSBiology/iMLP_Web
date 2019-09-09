@@ -1,4 +1,4 @@
-﻿// Template for webpack.config.js in Fable projects
+// Template for webpack.config.js in Fable projects
 // Find latest version in https://github.com/fable-compiler/webpack-config-template
 
 // In most cases, you'll only need to edit the CONFIG object (after dependencies)
@@ -27,9 +27,11 @@ var CONFIG = {
         // redirect requests that start with /api/* to the server on port 8085
         '/api/*': {
             target: 'http://localhost:' + (process.env.SERVER_PROXY_PORT || "8085"),
-               changeOrigin: true
-           }
-       },
+            changeOrigin: true,
+            proxyTimeout: 10 * 60 * 1000,
+            onProxyReq: (proxyReq, req, res) => req.setTimeout(10 * 60 * 1000)
+        }
+    },
     // Use babel-preset-env to generate JS compatible with most-used browsers.
     // More info at https://babeljs.io/docs/en/next/babel-preset-env.html
     babel: {
@@ -41,9 +43,9 @@ var CONFIG = {
                 useBuiltIns: 'usage',
                 corejs: 3
             }]
-        ],
+        ]
     }
-}
+};
 
 // If we're running the webpack-dev-server, assume we're in development mode
 var isProduction = !process.argv.find(v => v.indexOf('webpack-dev-server') !== -1);
@@ -73,14 +75,15 @@ module.exports = {
     // to prevent browser caching if code changes
     output: {
         path: resolve(CONFIG.outputDir),
-        filename: isProduction ? '[name].[hash].js' : '[name].js'
+        filename: isProduction ? '[name].[hash].js' : '[name].js',
+        publicPath: '/'
     },
     mode: isProduction ? 'production' : 'development',
     devtool: isProduction ? 'source-map' : 'eval-source-map',
     optimization: {
         splitChunks: {
             chunks: 'all'
-        },
+        }
     },
     // Besides the HtmlPlugin, we use the following plugins:
     // PRODUCTION
@@ -104,6 +107,7 @@ module.exports = {
     // Configuration for webpack-dev-server
     devServer: {
         publicPath: '/',
+        historyApiFallback: true,
         contentBase: resolve(CONFIG.assetsDir),
         host: '0.0.0.0',
         port: CONFIG.devServerPort,
