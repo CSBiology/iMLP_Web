@@ -93,8 +93,8 @@ module PlotHelpers =
             |> Array.mapi (fun i x -> (i+1,x)) 
         let plot =
             [
-                Chart.Spline(vals,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "Smoothed")
-                Chart.Column(vals,Color = FSharpAux.Colors.toWebColor csbDarkBlue,Name = "Scores")
+                Chart.Spline(vals,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "Smoothed",Width = 2.5)
+                Chart.Column(vals,Color = "rgba(68, 84, 106, 0.85)",Name = "Scores")
             
             ]
             |> Chart.Combine
@@ -155,7 +155,7 @@ let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
         |> Seq.toCSV "\t" false
     printfn "%A" str 
     str
-    |> Seq.write (sprintf "../Client/public/CsvResults/%s.csv" (id.ToString()))
+    |> Seq.write (sprintf "../Client/public/CsvResults/%s.txt" (id.ToString()))
 
 
 let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
@@ -299,7 +299,7 @@ let webApp =
     choose [
         webApi
         path "/" >=> browseFileHome "index.html"
-        pathScan "/api/downloadResults/%s" (fun fileName -> Successful.OK fileName)
+        //pathScan "/api/csvresults/%s" (fun fileName -> file (ServerPath.resolve ["..";"..";"client";"public";fileName]))
         browseHome
         RequestErrors.NOT_FOUND "Not found!"
     ]

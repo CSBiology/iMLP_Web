@@ -79,6 +79,10 @@ a.navbar-item.is-active {
     margin: 0 0 0 0;
 }
 
+.ProcessDecision:last-child {
+   margin-bottom: 0 !important;
+}
+
 .ProcessDecision .column {
     padding-left: 2rem;
     padding-right: 2rem;
@@ -207,6 +211,7 @@ a.navbar-item.is-active {
 #ResultHeading {
     background: rgba(222,235,247,0.95);
     margin-bottom: 0 !important;
+    margin-top: 0 !important;
 }
 
 #ResultHeading .column {

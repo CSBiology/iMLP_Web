@@ -205,7 +205,7 @@ let initialModel = {
     ResultHeadingIsSticky       =   false
     CurrentResultViewIndex      =   0
     DownloadReady               =   false
-    DownloadFileName            =   "IMTS_prediction_results.tsv"
+    DownloadFileName            =   "IMTS_prediction_results.txt"
     FileProcessIndex            =   0
     HasValidFasta               =   true
     InvalidFastaChars           =   []
@@ -689,10 +689,10 @@ let downloadBtn (location:string) (model:Model) (dispatch: Msg -> unit)=
         ]
         Column.column [Column.Width (Screen.Desktop, Column.Is2)] [
             a[
-                Props.Download (  if ( model.DownloadFileName.EndsWith(".tsv")) then
+                Props.Download (  if ( model.DownloadFileName.EndsWith(".txt")) then
                                         model.DownloadFileName
                                     else 
-                                        sprintf "%s.tsv" model.DownloadFileName
+                                        sprintf "%s.txt" model.DownloadFileName
                                         )
                 Props.Href location
                 Props.Class "is-primary is-full-width"
@@ -705,7 +705,7 @@ let downloadBtn (location:string) (model:Model) (dispatch: Msg -> unit)=
 
 let downloadView (model:Model) (dispatch: Msg -> unit) =
     if model.DownloadReady then
-        downloadBtn (sprintf "./CsvResults/%s.csv" (model.SessionGuid.ToString())) model dispatch
+        downloadBtn (sprintf "./CsvResults/%s.txt" (model.SessionGuid.ToString())) model dispatch
     else
         Button.button [
                     Button.IsLoading model.HasJobRunning
@@ -916,7 +916,7 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
             ]
             fastaFormatDisplay model (res.Sequence.ToCharArray()) (if model.PlotMode = Propensity then res.Propensity else res.Scores)
             hr []
-            Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
+            Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
             iframe [
                 Props.SrcDoc
                     (
@@ -1194,13 +1194,11 @@ let hero (model : Model) (dispatch : Msg -> unit) =
     Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
         Hero.body [] [
             Container.container [] [
-                br []
-                br []
                 Heading.h1 [] [
                     str "iMTS-Ls Prediction"
                 ]
                 br []
-                Heading.h3 [Heading.IsSubtitle] [
+                Heading.h4 [Heading.IsSubtitle] [
                     str "Additional to their N-terminal matrix-targeting signals (MTSs), many preproteins contain additional internal MTS-like signals (iMTS-Ls) in their mature region that share similar characteristic properties. Tom70-mediated interaction with these iMTS-Ls improves the import competence of preproteins and increases the efficiency of their translocation into the mitochondrial matrix."
                     br []
                     br []
