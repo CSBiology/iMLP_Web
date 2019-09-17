@@ -136,6 +136,23 @@ a.navbar-item.is-active {
     font-weight: 1200;
 }
 
+.gradient-legend {
+    background: #faee05; /* Old browsers */
+    background: -moz-linear-gradient(left, #faee05 0%, #ed7d31 100%); /* FF3.6-15 */
+    background: -webkit-linear-gradient(left, #faee05 0%,#ed7d31 100%); /* Chrome10-25,Safari5.1-6 */
+    background: linear-gradient(to right, #faee05 0%,#ed7d31 100%); /* W3C, IE10+, FF16+, Chrome26+, Opera12+, Safari7+ */
+    filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#faee05', endColorstr='#ed7d31',GradientType=1 ); /* IE6-9 */
+    width:20rem;
+    padding: 0.75rem;
+    display: inline-block;
+}
+
+.spacer {
+    width: 14rem;
+    padding: 0.75rem;
+    display: inline-block;
+}
+
 .leftSelector {
     background-color: rgba(256, 256, 256, 1.0);
 

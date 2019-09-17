@@ -636,8 +636,8 @@ let pageinateDynamic (pos: int) (res: TargetPResult array) (model:Model) (dispat
     numbers 
 
 let fastaFormatDisplay (model:Model) (sequence:char array) (imtsIndices: int []) (scores: float array) =
-    console.log(sequence |> Seq.fold (fun a x -> sprintf "%s%c" a x) "")
-    console.log(scores)
+    //console.log(sequence |> Seq.fold (fun a x -> sprintf "%s%c" a x) "")
+    //console.log(scores)
     let scores' =
         if model.PlotMode = Propensity then
             scores
@@ -648,6 +648,7 @@ let fastaFormatDisplay (model:Model) (sequence:char array) (imtsIndices: int [])
         else
             scores
     let maxVal = Array.max scores'
+    
     let norm = 
         scores'
         |> Array.map (fun s -> s/maxVal)
@@ -674,14 +675,34 @@ let fastaFormatDisplay (model:Model) (sequence:char array) (imtsIndices: int [])
     let formatStrings = 
         spans
         |> Array.chunkBySize 60
-        |> Array.mapi (fun i spans ->   let lineIndex = (i * 60 + 1)
-                                        let indexText = sprintf "%i%s" lineIndex ([for x in 1 .. (10 - (string lineIndex).Length) do yield "."] |> String.concat "")
-                                        div [] [  
-                                                    yield span [] [ str indexText]; 
-                                                    yield! spans 
-                                                    ])
+        |> Array.mapi
+            (fun i spans ->
+                let lineIndex = (i * 60 + 1)
+                let indexText =
+                    sprintf
+                        "%i%s"
+                        lineIndex
+                        ([for x in 1 .. (10 - (string lineIndex).Length) do yield "."] |> String.concat "")
+                div [] [  
+                    yield span [] [ str indexText]; 
+                    yield! spans 
+                ]
+            )
+    let minLegend = Array.min scores
+    let maxLegend = Array.max scores
     Content.content [] [
+        yield br []
         yield! formatStrings 
+        yield br []
+        yield
+            div[Class "gradient-legend"] [str ""]
+            
+        yield
+            div [] [
+                span [Style [TextAlign TextAlignOptions.Left]] [ str (sprintf "%.2f" minLegend) ]
+                div [Class "spacer"] []
+                span [Style [TextAlign TextAlignOptions.Right]] [ str (sprintf "%.2f" maxLegend) ]
+            ]
     ]
 
 let downloadBtn (location:string) (model:Model) (dispatch: Msg -> unit)=

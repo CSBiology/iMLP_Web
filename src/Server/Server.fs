@@ -24,6 +24,38 @@ open BioFSharp.BioTools
 open FSharpAux
 open Suave.Logging
 
+
+module Config =
+
+    type DeployMode =
+    |Local
+    |Server
+
+
+    let deployConfig =
+        DeployMode.Local
+
+module Paths =
+
+    open Config
+
+    [<Literal>]
+    let local = @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src"
+
+    [<Literal>]
+    let server = @"C:\SafeApps\TargetPService\deploy"
+
+    let getLocalPath p =
+        Path.Combine(local,p)
+
+    let getAbsoluteServerPath p =
+        Path.Combine(server,p)
+
+    let deploymentSpecificPath =
+        match deployConfig with
+        |Local -> getLocalPath
+        |Server -> getAbsoluteServerPath
+
 module Propensity =
     open FSharp.Stats
 
@@ -270,7 +302,11 @@ let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
         |> Seq.toCSV "\t" false
     printfn "%A" str 
     str
-    |> Seq.write (sprintf "../Client/public/CsvResults/%s.txt" (id.ToString()))
+    |> Seq.write
+        (
+            sprintf @"Client/public/CsvResults/%s.txt" (id.ToString())
+            |> Paths.deploymentSpecificPath
+        )
 
 
 let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
@@ -299,7 +335,13 @@ let targetPApi = {
 
                 let client = Docker.connect "npipe://./pipe/docker_engine"
                 let tpContext = 
-                        BioContainer.initBcContextWithMountAsync client TargetP.ImageTagetP @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src\Server\tmp"
+                        BioContainer.initBcContextWithMountAsync
+                            client
+                            TargetP.ImageTagetP
+                            (
+                                @"Server\tmp"
+                                |> Paths.deploymentSpecificPath
+                            )
                         |> Async.RunSynchronously
 
                 //read fasta item from input
@@ -326,8 +368,15 @@ let targetPApi = {
                         |> singleSequenceToMany
 
                 let paths =
-                    [|for i in splitSeqs -> System.Threading.Thread.Sleep 10; sprintf @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src\Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())|]
-
+                    splitSeqs
+                    |> Seq.map
+                        (fun _ ->
+                            System.Threading.Thread.Sleep 10
+                            sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
+                            |> Paths.deploymentSpecificPath
+                        )
+                    |> Array.ofSeq
+                    
                 splitSeqs
                 |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
 
@@ -368,7 +417,12 @@ let targetPApi = {
     DownloadRequestSingle = 
         fun (res,id)-> 
             async { 
-                    for f in (System.IO.Directory.EnumerateFiles("../Client/public/CsvResults/"))
+                    for f in
+                        (
+                            @"Client/public/CsvResults"
+                            |> Paths.deploymentSpecificPath
+                            |> System.IO.Directory.EnumerateFiles
+                        )
                         do File.Delete(f)
                     targetPResultsToCsv [res] id
                     return ()
@@ -377,7 +431,12 @@ let targetPApi = {
     DownloadRequestMultiple = 
         fun (res,id) -> 
             async {
-                    for f in (System.IO.Directory.EnumerateFiles("../Client/public/CsvResults/"))
+                    for f in
+                        (
+                            @"Client/public/CsvResults"
+                            |> Paths.deploymentSpecificPath
+                            |> System.IO.Directory.EnumerateFiles
+                        )
                         do File.Delete(f)
                     targetPResultsToCsv res id
                     return ()
