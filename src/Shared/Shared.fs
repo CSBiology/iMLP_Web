@@ -12,11 +12,19 @@ type TargetPModel =
 |Plant
 |NonPlant
 
+//Start and end indices 0 based!
+type IMTSL = {
+    StartIndex: int
+    EndIndex: int
+    ScoreSum : float
+}
+
 type TargetPResult = {
     Header              : string
     Sequence            : string
     Scores              : float array
     Propensity          : float array
+    PredictedIMTSL      : IMTSL array
     PropensityPlotHtml  : string
     ScorePlotHtml       : string
 }

@@ -1,4 +1,3 @@
-
 body {
     overflow-y : auto;
     background-image: url("/Images/CircuitBrain.jpg");
@@ -280,11 +279,9 @@ a.navbar-item.is-active {
     background-color: rgb(68,84,106);
 }
 
-
 .leftResultBar {
     text-align:right;
 }
-
 
 a[download] {
     font-size: 1.5em;
@@ -308,7 +305,6 @@ a[download]:focus{
     text-decoration: none;
 }
 
-
 #prepareDownload{
     font-size: 1.5em;
     line-height: 100%;
@@ -330,7 +326,6 @@ a[download]:focus{
 
 .ErrorSection h1 {
     color: red
-
 }
 
 .resetBtn {
@@ -344,6 +339,7 @@ a[download]:focus{
     background-color: rgb(68,84,106);
     color: rgb(237, 125, 49);
 }
+
 .plotModeBtnActive:focus {
     border-color: rgb(237, 125, 49) !important;
     background-color: rgb(68,84,106) !important;
@@ -360,4 +356,75 @@ a[download]:focus{
     border: 1px solid rgb(68,84,106) !important;
     background-color: rgb(222, 235, 247) !important;
     color: rgb(68,84,106) !important;
+}
+
+.footer-left {
+    background-color: rgba(68,84,106, 0.95);
+    text-align: right;
+    padding-right: 4rem;
+    color: white;
+
+    @supports (backdrop-filter: blur(3px)) or (--webkit-backdrop-filter: blur(3px)) {
+        background-color: rgba(68,84,106, 0.85);
+        -webkit-backdrop-filter: blur(5px);
+        backdrop-filter: blur(5px);
+    }
+}
+
+.footer-right {
+    text-align: left;
+    padding-left: 4rem;
+    background-color: rgba(256, 256, 256, 1.0);
+    color: black;
+
+    @supports (backdrop-filter: blur(3px)) or (--webkit-backdrop-filter: blur(3px)) {
+        background-color: rgba(256, 256, 256, 0.85);
+        -webkit-backdrop-filter: blur(5px);
+        backdrop-filter: blur(5px);
+    }
+}
+
+.footer-left a {
+    text-decoration:none;
+    color: white
+}
+
+.footer-left a:hover {
+    cursor: pointer;
+    color: #ed7d31;
+    font-weight: bold
+}
+
+.footer-right a {
+    text-decoration: none;
+    color: rgb(68,84,106)
+}
+
+.footer-right a:hover {
+    cursor: pointer;
+    color: #ed7d31;
+    font-weight: bold
+}
+
+.csbFooter {
+    /*background-color: #fafafa;*/
+    margin: 0 0 0 0;
+}
+
+.csbFooter:last-child {
+    margin-bottom: 0 !important;
+}
+
+.csbFooter .column {
+    padding-left: 2rem;
+    padding-right: 2rem;
+}
+
+.footerSection {
+    padding: 0rem;
+}
+
+.footer {
+    padding: 1rem !important;
+    text-align: center
 }

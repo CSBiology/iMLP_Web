@@ -635,7 +635,7 @@ let pageinateDynamic (pos: int) (res: TargetPResult array) (model:Model) (dispat
         |> List.map (fun index -> pageinateFromIndex res index model dispatch) 
     numbers 
 
-let fastaFormatDisplay (model:Model) (sequence:char array) (scores: float array) =
+let fastaFormatDisplay (model:Model) (sequence:char array) (imtsIndices: int []) (scores: float array) =
     console.log(sequence |> Seq.fold (fun a x -> sprintf "%s%c" a x) "")
     console.log(scores)
     let scores' =
@@ -657,10 +657,20 @@ let fastaFormatDisplay (model:Model) (sequence:char array) (scores: float array)
             x |> Array.map2 (fun char score -> int ((score) * 100.) ,char) sequence
     let spans =
         norm 
-        |> Array.map (fun (score,char) -> span [Props.Style [
-                                                                    CSSProp.BackgroundColor (gradientColorTable.[int (round (float score / 10.))]);
-                                                                    CSSProp.Color "#44546A"
-                                                                    ]] [b [] [str (string char)]])
+        |> Array.mapi
+            (fun i (score,char) ->
+                span [
+                    Props.Style [
+                        //if (Array.contains i imtsIndices) then
+                        //    yield CSSProp.Color "#44546A"
+                        //else
+                        //    yield CSSProp.Color "rgba(68,84,106,0.8)"
+                        yield CSSProp.BackgroundColor (gradientColorTable.[int (round (float score / 10.))])
+                        yield CSSProp.Color "#44546A"
+                        ]] [b [] [str (string char)
+                    ]
+                ]
+            )
     let formatStrings = 
         spans
         |> Array.chunkBySize 60
@@ -914,7 +924,15 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
                 else
                     yield str "Raw TargetP sequence score heatmap:"
             ]
-            fastaFormatDisplay model (res.Sequence.ToCharArray()) (if model.PlotMode = Propensity then res.Propensity else res.Scores)
+            fastaFormatDisplay
+                model
+                (res.Sequence.ToCharArray())
+                (
+                    res.PredictedIMTSL
+                    |> Array.map (fun x -> [|x.StartIndex .. x.EndIndex|])
+                    |> Array.concat
+                )
+                (if model.PlotMode = Propensity then res.Propensity else res.Scores)
             hr []
             Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
             iframe [
@@ -960,7 +978,15 @@ let multipleResults (model : Model) (dispatch: Msg -> unit) (res: TargetPResult 
             plotModeSwitch model dispatch
             hr []
             Heading.h4 [] [str "Sequence score heatmap:"]
-            fastaFormatDisplay model (sequence.ToCharArray()) (if model.PlotMode = Propensity then propensity else scores)
+            fastaFormatDisplay
+                model
+                (res.[index].Sequence.ToCharArray())
+                (
+                    res.[index].PredictedIMTSL
+                    |> Array.map (fun x -> [|x.StartIndex .. x.EndIndex|])
+                    |> Array.concat
+                )
+                (if model.PlotMode = Propensity then res.[index].Propensity else res.[index].Scores)
             hr []
             Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
             iframe [
@@ -1225,7 +1251,6 @@ let errorDisplay (model : Model) (dispatch : Msg -> unit) =
             str "Oopsie!"
             Icon.icon [Icon.IsRight; Icon.Size IsLarge] [Fa.i [Fa.Solid.SkullCrossbones] []]
             ]
-
         Heading.h2 [] [str "An error occured. Click the button below to reset the app state:"]
         Button.button [Button.CustomClass "is-danger resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
         br []
@@ -1233,9 +1258,13 @@ let errorDisplay (model : Model) (dispatch : Msg -> unit) =
         Heading.h3 [] [str "If you are a developer and/or interested in the stack trace you can see the error message below."]
         br []
         Content.content [] [
-            Heading.h3 [] [str msg]
-            Heading.h3 [] [str "StackTrace:"]
-            Heading.h5 [] [str stackTrace]
+            Dropdown.dropdown [] [
+                Dropdown.content [] [
+                    Heading.h3 [] [str msg]
+                    Heading.h3 [] [str "StackTrace:"]
+                    Heading.h5 [] [str stackTrace]
+                ]
+            ]
         ]
     ]
 
@@ -1250,41 +1279,88 @@ let view (model : Model) (dispatch : Msg -> unit) =
             inputSelection model dispatch
             resultHeading model dispatch (match model.FastaFileInputResult with |Some r -> r | _ -> [||])
             resultSection model dispatch
+            //Section.section [Section.CustomClass "footerSection"] [
+            //    div [] [
+            //       Columns.columns [Columns.CustomClass "csbFooter"] [
+            //            Column.column [Column.Width (Screen.Desktop, Column.Is7); Column.CustomClass "footer-left"] [
+            //                Columns.columns [] [
+            //                    Column.column [Column.Width (Screen.Desktop, Column.Is3)] []
+            //                    Column.column [Column.Width (Screen.Desktop, Column.Is9)] [
+            //                        br []
+            //                        br []
+            //                        Heading.h3 [Heading.IsSubtitle; Heading.IsSpaced] [
+            //                            str "Built with"
+            //                        ]
+            //                        hr []
+            //                        ul [] [
+            //                            li [ ] [a [Props.Href ""] [str "F#"]]
+            //                            li [ ] [a [Props.Href ""] [str "BioFSharp"]]
+            //                            li [ ] [a [Props.Href ""] [str "SAFE Stack"]]
+            //                        ]
+            //                        br []
+
+            //                        a [Props.Href ""] [str "SourceCode available here"]
+
+            //                        br []
+
+            //                        str "For more information about targetP, head "
+            //                        a [Props.Href "http://www.cbs.dtu.dk/services/TargetP/"] [str "here"]
+            //                        br []
+            //                    ]
+            //                ]
+            //            ]
+            //            Column.column [Column.Width (Screen.Desktop, Column.Is5);Column.CustomClass "footer-right"] [
+            //                Columns.columns [] [
+            //                    Column.column [Column.Width (Screen.Desktop, Column.Is8)] [
+            //                        br []
+            //                        br[]
+            //                        Heading.h3 [Heading.IsSubtitle; Heading.IsSpaced] [
+            //                            str "Get in touch with us"
+            //                        ]
+            //                        hr []
+            //                        ul [] [
+            //                            li [] [
+            //                                a [Props.Href "https://twitter.com/biofsharp"] [
+            //                                    Icon.icon [] [
+            //                                        Fa.i [Fa.Brand.Twitter] []
+            //                                        ]
+            //                                    str "BioFSharp on Twitter"
+            //                                ]
+
+            //                            ]
+            //                            li [] [
+            //                                a [Props.Href "https://twitter.com/https://twitter.com/cs_biology"] [
+            //                                    Icon.icon [] [
+            //                                        Fa.i [Fa.Brand.Twitter] []
+            //                                        ]
+            //                                    str "Computational Systems Biology on Twitter"
+            //                                ]
+
+            //                            ]
+            //                            li [] [
+            //                                a [Props.Href "https://twitter.com/biofsharp"] [
+            //                                    Icon.icon [] [
+            //                                        Fa.i [Fa.Brand.Twitter] []
+            //                                        ]
+            //                                    str "Computational Systems Biology on Github"
+            //                                ]
+
+            //                            ]
+            //                        ]
+            //                        br []
+            //                    ]
+            //                    Column.column [Column.Width (Screen.Desktop, Column.Is4)] []
+            //                ]
+            //            ] 
+            //        ]
+            //    ]
+            //]
             Footer.footer [] [
-                Container.container [] [
-                    Columns.columns [] [
-                        Column.column [] [
-                        
-                            str "built with <3,"
-                            ul [] [
-                                br []
-                                li [Props.Href "" ] [a [] [str "F#"; str","]]
-                                br []
-                                li [Props.Href "" ] [a [] [str "BioFSharp"]; str","]
-                                br []
-                                li [Props.Href "" ] [str "and ";a [] [str "SAFE Stack"]]
-                            ] 
-                        ]
-                        Column.column [] [
-                            str "This service uses the targetP under the hood."
-                            br []
-                            br []
-                            str "For more information about targetP, head "
-                            a [Props.Href "http://www.cbs.dtu.dk/services/TargetP/"] [str "here"]
-                        ]
-                        Column.column [] [
-                            str "Verion 0.1.0."
-                            br []
-                            br []
-                            str " This service is developed and maintained by the "
-                            a [Props.Href ""] [str "Computational Systems Biology department "]
-                            str "of the TU Kaiserslautern, Germany."
-                            br []
-                            br []
-                            a [Props.Href ""] [str "SourceCode available here"]
-                        ]
-                    ]
-                ]            
+                Content.content [] [
+                    str "This service is developed and maintained by the "
+                    a [Props.Href "https://csb.bio.uni-kl.de/"] [str "Computational Systems Biology department "]
+                    str "of the TU Kaiserslautern, Germany."
+                ]
             ]
         ]
 

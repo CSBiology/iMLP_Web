@@ -14,3 +14,4 @@ release.sh
 deploy
 /src/Client/public/BulmaJS-master
 /src/Server/tmp
+/src/Client/public/CsvResults
