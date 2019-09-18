@@ -419,11 +419,12 @@ let targetPApi = {
             async { 
                     for f in
                         (
-                            @"Client/public/CsvResults"
-                            |> Paths.deploymentSpecificPath
-                            |> System.IO.Directory.EnumerateFiles
+                            let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
+                            System.IO.DirectoryInfo(path).GetFiles()
                         )
-                        do File.Delete(f)
+                        do
+                            if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then
+                                File.Delete(f.FullName)
                     targetPResultsToCsv [res] id
                     return ()
                     }
@@ -433,11 +434,12 @@ let targetPApi = {
             async {
                     for f in
                         (
-                            @"Client/public/CsvResults"
-                            |> Paths.deploymentSpecificPath
-                            |> System.IO.Directory.EnumerateFiles
+                            let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
+                            System.IO.DirectoryInfo(path).GetFiles()
                         )
-                        do File.Delete(f)
+                        do
+                            if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then
+                                File.Delete(f.FullName)
                     targetPResultsToCsv res id
                     return ()
                     }
