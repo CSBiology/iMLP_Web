@@ -296,11 +296,16 @@ let rand = new System.Random()
 let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
     let str = 
         [
-            yield ("Header","Sequence","Scores")
-            for r in res do yield (r.Header,r.Sequence,r.Scores |> Array.fold (fun acc elem -> sprintf "%s; %f" acc elem) "")
+            yield ("Header","Sequence","iMTS-L_Propensity")
+            for r in res do
+                yield
+                    (
+                        r.Header,
+                        r.Sequence,
+                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
+                    )
         ]
         |> Seq.toCSV "\t" false
-    printfn "%A" str 
     str
     |> Seq.write
         (

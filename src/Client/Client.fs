@@ -158,10 +158,9 @@ type Mode =
 
 type DisplayHelp =
 |NoHelp
-|TechnicalDetails
+|TechnicalScientificDetails
 |Contact
 |HowToUse
-|Publication
 |InputFormat
 
 type PlotMode =
@@ -262,9 +261,11 @@ let gradientColorTable = [|
 |]
 
 type CustomHTMLAttr = 
-    | [<CompiledName("data-dismiss")>] DataDismiss of string
-    | [<CompiledName("aria-label")>] AriaLabel of string
-    | [<CompiledName("aria-hidden")>] AriaHidden of bool
+    | [<CompiledName("data-dismiss")>]  DataDismiss     of string
+    | [<CompiledName("aria-label")>]    AriaLabel       of string
+    | [<CompiledName("aria-hidden")>]   AriaHidden      of bool
+    | [<CompiledName("aria-controls")>] AriaControls    of string
+    | [<CompiledName("aria-haspopup")>] AriaHasPopup    of bool
     interface IHTMLProp 
 
 // defines the initial state and initial command (= side-effect) of the application
@@ -509,13 +510,6 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
                 ]
                 Navbar.Item.a
                     [
-                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = Publication then NoHelp else Publication) |> dispatch)]
-                        Navbar.Item.IsActive (currentDisp = Publication)
-                    ] [
-                    str "Publication"
-                ]
-                Navbar.Item.a
-                    [
                         Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = InputFormat then NoHelp else InputFormat) |> dispatch)]
                         Navbar.Item.IsActive (currentDisp = InputFormat)
                     ] [
@@ -524,8 +518,8 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
                 ]
                 Navbar.Item.a
                     [
-                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = TechnicalDetails then NoHelp else TechnicalDetails) |> dispatch)]
-                        Navbar.Item.IsActive (currentDisp = TechnicalDetails)
+                        Navbar.Item.Props [OnClick (fun _ -> ChangeHelpDisplay (if currentDisp = TechnicalScientificDetails then NoHelp else TechnicalScientificDetails) |> dispatch)]
+                        Navbar.Item.IsActive (currentDisp = TechnicalScientificDetails)
                     ] [
                     str "Technical details"
                 ]
@@ -542,14 +536,36 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
+let createDropdown dropdownBtnText id children =
+    Dropdown.dropdown [] [
+        div [Class "dropdown-trigger"] [
+            Button.button [Button.Props [AriaHasPopup true; AriaControls id]] [
+                span [] [str dropdownBtnText]
+                Icon.icon [] [Fa.i [Fa.Solid.AngleDown] []]
+            ]
+        ]
+        Dropdown.menu [Props [Id id ; Role "menu"]] [
+            Dropdown.content [] [
+                yield! children
+            ]   
+        ]
+    ]
+
+
 let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     
     match model.InformationSectionDisplay with
     |NoHelp         -> []
-    |TechnicalDetails ->
+    |TechnicalScientificDetails ->
         [
             br []
-            Heading.h4 [] [str "Technical Details   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            Heading.h4 [] [str "Scientific Details - our research about iMTS-L prediction:" ; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            ul [] [
+                li [] [str "Backes, S. et al. (2018) Tom70 enhances mitochondrial preprotein import efficiency by binding to internal targeting sequences. J. Cell Biol., 2018: 10.1083/jcb.201708044."]
+                li [] [str "Boos, F. et al. (2018) Detection of Internal Matrix Targeting Signal-like Sequences (iMTS-Ls) in Mitochondrial Precursor Proteins Using the TargetP Prediction Tool. BIO-PROTOCOL, 8, 2018: 10.21769/BioProtoc.2474."]
+            ]
+            br []
+            Heading.h4 [] [str "Technical Details   "]
             br []
             str "This service uses a server-side nested virtualization procedure to enable querying a targetP docker container."
             br []
@@ -559,7 +575,9 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             str "This enables the realisation of OS-agnostic services, here the calling of targetP - a command line tool usually only available to unix host machines."
             br []
             br []
-            str "We designed a F# library - BioFSharp.BioTools - to reliably run docker tasks from the .NET environment, therefore making dockerized non-windows applications available for the .NET ecosystem."
+            str "We designed a F# library - "
+            a [Props.Href "https://github.com/CSBiology/BioFSharp/tree/master/src/BioFSharp.BioTools"] [str "BioFSharp.BioTools"]
+            str " - to reliably run docker tasks from the .NET environment, therefore making dockerized non-windows applications available for the F# ecosystem."
         ]
     |Contact        ->
         [
@@ -567,8 +585,8 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
             br []
             ul [] [
-                li [] [a[] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
-                li [] [a[] [str "Kevin Schneider"] ; str ", Computational Systems Biology Kaiserslautern"]
+                li [] [a[Props.Href "mailto:muehlhaus@bio.uni-kl.de"] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
+                li [] [a[Props.Href "mailto:schneike@rhrk.uni-kl.de"] [str "Kevin Schneider"] ; str ", Computational Systems Biology Kaiserslautern"]
             ]
         ]
     |HowToUse       ->
@@ -577,18 +595,58 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
             br []
             ol [] [
-                li [] [str "Some stepz"]
-                li [] [str "Some stepz"]
-                li [] [str "Some stepz"]
-                li [] [str "Some stepz"]
+                li [] [
+                    Heading.h6 [Heading.IsSubtitle] [
+                        str "General"
+                    ]
+                    str ""
+                ]
+                li [] [
+                    Heading.h6 [Heading.IsSubtitle] [
+                        str "Input"
+                    ]
+                    a [OnClick (fun _ -> ChangeHelpDisplay (InputFormat) |> dispatch)] [str "Learn more about the input format here"]
+                    br []
+                    br []
+                    str "Provide input either via entering a single protein sequence in the textbox or by oploading a file pressing the file link below the textbox."
+                    br []
+                    br []
+                    str "When provided a single sequence via the textbox, a single iMTS-L prediction report will pop in the Result section once the prediction is finished."
+                    br []
+                    br []
+                    str "When provided a file with multiple sequences, iMTS-L prediction results will be generated one after another. You can view the results in the Result section as they are generated, meaning the amount of tabs in the Result section will increase over time while the predictions are finished. You can observe the progress on a per-sequence basis via the progress bar."
+                    br []
+                    br[]
+
+                ]
+                li [] [
+                    Heading.h6 [Heading.IsSubtitle] [
+                        str "Output - Plots"
+                    ]
+                    str "The generated plots are fully interactive, meaning you can zoom, pinch, etc."
+                    br []
+                    br []
+                    str "If you like the plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "
+                    br[]
+                    br[]
+                ]
+                li [] [
+                    Heading.h6 [Heading.IsSubtitle] [
+                        str "Output - Download tab separated results"
+                    ]
+                    str "A download link for your results in tab separated form can be generated using the button on the bottom of the results section."
+                    br []
+                    str "Format:"
+                    pre [] [
+                        str
+                            "\"Header\"\t\"Sequence\"\t\"Scores\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
+                    ]
+                    br []
+                    str "Once you generated the link, press on the download button to start the download."
+                    br[]
+                    br[]
+                ]
             ]
-        ]
-    |Publication    ->
-        [
-            br []
-            Heading.h4 [] [str "About the publication this service is built on   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
-            br []
-            str "Lorem ipsum dolor sit amet"
         ]
     |InputFormat    ->
         [
@@ -1245,18 +1303,28 @@ let hero (model : Model) (dispatch : Msg -> unit) =
     Hero.hero [Hero.IsMedium; Hero.CustomClass "csbHero"] [
         Hero.body [] [
             Container.container [] [
-                Heading.h1 [] [
-                    str "iMTS-Ls Prediction"
+                Heading.h1 [Heading.IsSpaced] [
+                    str "iMLP : iMTS-L predictor service"
                 ]
                 br []
-                Heading.h4 [Heading.IsSubtitle] [
-                    str "Additional to their N-terminal matrix-targeting signals (MTSs), many preproteins contain additional internal MTS-like signals (iMTS-Ls) in their mature region that share similar characteristic properties. Tom70-mediated interaction with these iMTS-Ls improves the import competence of preproteins and increases the efficiency of their translocation into the mitochondrial matrix."
-                    br []
-                    br []
-                    str"For more information see Backes et al. 2018 [DOI: 10.1083/jcb.201708044]."
+                Heading.h4 [Heading.IsSubtitle;Heading.IsSpaced] [
+                    str "Additional to their N-terminal matrix-targeting signals (MTSs), many preproteins contain additional internal MTS-like signals (iMTS-Ls) in their mature region which improve the import competence of preproteins and increases the efficiency of their translocation into the mitochondrial matrix."
                     br []
                     br []
                     str "This tool allows the prediction of iMTS-Ls for proteins of interest."
+                    br []
+                    br []
+                    str"For more scientific background, take a look at the "
+                    a [
+                        OnClick (fun _ -> ChangeHelpDisplay TechnicalScientificDetails |> dispatch)
+                        Style [
+                            TextDecoration "none"
+                            Color "white"
+                        ]
+                        ][
+                            str "'Details'"
+                    ]
+                    str " section." 
                     ]
             ]
         ]
@@ -1284,6 +1352,7 @@ let errorDisplay (model : Model) (dispatch : Msg -> unit) =
         br []
         Content.content [] [
             Dropdown.dropdown [] [
+                Dropdown.trigger [] 
                 Dropdown.content [] [
                     Heading.h3 [] [str msg]
                     Heading.h3 [] [str "StackTrace:"]
