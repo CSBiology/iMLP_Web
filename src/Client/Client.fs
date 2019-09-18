@@ -129,7 +129,11 @@ let validateFastaText (fsa:string) =
         |> fun x -> x.Replace("\r\n","\n")
         |> fun x -> x.Split('\n')
         |> Array.filter (fun x -> not (x.StartsWith(">")))
-    let validSet = set ['A';'C';'D';'E';'F';'G';'H';'I';'K';'L';'M';'N';'O';'P';'Q';'R';'S';'T';'U';'V';'W';'Y';'X';'J';'Z';'B';'*';'-';'\n';'\r']
+    let validSet =
+        set [
+            'A';'C';'D';'E';'F';'G';'H';'I';'K';'L';'M';'N';'O';'P';'Q';'R';'S';'T';'U';'V';'W';'Y';'X';'J';'Z';'B';'*';'-';'\n';'\r'
+            'a';'c';'d';'e';'f';'g';'h';'i';'k';'l';'m';'n';'o';'p';'q';'r';'s';'t';'u';'v';'w';'y';'x';'j';'z';'b'
+            ]
 
     let invalidChars =
         allSeqs
