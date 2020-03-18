@@ -1,7 +1,7 @@
 module TargetPServer
 
-open BioFSharp.BioTools
-open BioFSharp.BioTools.TargetP
+open BioFSharp.BioContainers
+open BioFSharp.BioContainers.TargetP
 open System.IO
 open BioContainer
 open FSharpAux

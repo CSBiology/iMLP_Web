@@ -20,7 +20,7 @@ open FSharpAux
 open FSharpAux.IO
 open FSharp.Plotly
 
-open BioFSharp.BioTools
+open BioFSharp.BioContainers
 open FSharpAux
 open Suave.Logging
 
@@ -342,7 +342,7 @@ let targetPApi = {
                 let tpContext = 
                         BioContainer.initBcContextWithMountAsync
                             client
-                            TargetP.ImageTagetP
+                            TargetP.ImageTargetP
                             (
                                 @"Server\tmp"
                                 |> Paths.deploymentSpecificPath
@@ -389,7 +389,7 @@ let targetPApi = {
                 let scores = 
                     paths
                     |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
-                    |> Array.map (fun tpres ->tpres |>  Seq.map (fun x -> x.Mtp))
+                    |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
                     |> Seq.concat
                     |> Array.ofSeq
 

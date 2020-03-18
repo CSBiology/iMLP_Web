@@ -6,21 +6,14 @@ group Server
     nuget FSharp.Core
     nuget Suave 2.5.5
     nuget Fable.Remoting.Suave ~> 3
-    nuget FSharp.Plotly
 
-    git https://github.com/CSBiology/FSharpAux.git nuget Packages: /
-
-    nuget FSharpAux
-    nuget FSharpAux.IO
-
-    git https://github.com/CSBiology/BioFSharp.git nuget Packages: /
-
-    nuget BioFSharp
-    nuget BioFSharp.IO
-    nuget BioFSharp.BioTools
-
-    git https://github.com/CSBiology/FSharp.Stats.git nuget Packages: /
-    nuget FSharp.Stats
+    nuget FSharp.Plotly >= 1.2.0
+    nuget FSharpAux >= 1.0.0
+    nuget FSharpAux.IO >= 1.0.0
+    nuget BioFSharp >= 1.0.3
+    nuget BioFSharp.IO >= 1.0.3
+    nuget BioFSharp.BioContainers >= 1.0.3
+    nuget FSharp.Stats >= 0.2.1-beta
 
 group Client
     source https://api.nuget.org/v3/index.json
@@ -40,6 +33,7 @@ group Client
     nuget Fable.Remoting.Client ~> 5
     nuget Fulma ~> 2
     nuget Fable.FontAwesome.Free ~> 2
+    nuget Feliz.Plotly >= 0.12.0
 
 group Build
     source https://api.nuget.org/v3/index.json

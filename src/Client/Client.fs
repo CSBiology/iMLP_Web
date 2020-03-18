@@ -485,9 +485,8 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
             Navbar.Item.a [Navbar.Item.Props [Props.Href "https://csb.bio.uni-kl.de/"]] [
                 img [Props.Src "../Images/Logo.png"]
             ]
-            Navbar.burger   [
-                                Props [
-                                    Class (if model.BurgerVisible then "navbar-burger is-active" else "navbar-burger")
+            Navbar.burger   [   Navbar.Burger.IsActive model.BurgerVisible
+                                Navbar.Burger.Props [
                                     Props.Role "button"
                                     AriaLabel "menu"
                                     Props.AriaExpanded false
@@ -576,7 +575,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             br []
             br []
             str "We designed a F# library - "
-            a [Props.Href "https://github.com/CSBiology/BioFSharp/tree/master/src/BioFSharp.BioTools"] [str "BioFSharp.BioTools"]
+            a [Props.Href "https://github.com/CSBiology/BioFSharp/tree/master/src/BioFSharp.BioContainers"] [str "BioFSharp.BioContainers"]
             str " - to reliably run docker tasks from the .NET environment, therefore making dockerized non-windows applications available for the F# ecosystem."
         ]
     |Contact        ->
@@ -1352,7 +1351,7 @@ let errorDisplay (model : Model) (dispatch : Msg -> unit) =
         br []
         Content.content [] [
             Dropdown.dropdown [] [
-                Dropdown.trigger [] 
+                Dropdown.trigger [] []
                 Dropdown.content [] [
                     Heading.h3 [] [str msg]
                     Heading.h3 [] [str "StackTrace:"]

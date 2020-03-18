@@ -10,4 +10,4 @@ group Client
     Fable.Remoting.Client
     Fulma
     Fable.FontAwesome.Free
-
+    Feliz.Plotly
