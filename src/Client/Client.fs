@@ -170,6 +170,8 @@ type PlotMode =
 // The model holds data that you want to keep track of while the application is running
 type Model = { 
     SessionGuid                 :   System.Guid
+    EULAAccepted                :   bool
+    EULAModalVisible            :   bool
     BurgerVisible               :   bool
     SelectedTargetPModel        :   TargetPModel
     SingleSequence              :   string
@@ -196,6 +198,8 @@ type Model = {
 
 let initialModel = {
     SessionGuid                 =   System.Guid.NewGuid()
+    EULAAccepted                =   false
+    EULAModalVisible            =  false
     BurgerVisible               =   false
     SelectedTargetPModel        =   TargetPModel.NonPlant
     SingleSequence              =   ""
@@ -225,6 +229,8 @@ let initialModel = {
 type Msg =
 | Reset
 | ToggleBurger
+| EULAAcceptedChange
+| ShowEulaModal             of bool
 | TargetPModelSelection     of TargetPModel
 | SeqModeSelection          of Mode
 | FastaUploadInput          of string*string
@@ -278,6 +284,12 @@ let init () : Model * Cmd<Msg> =
 let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | Reset -> init ()
+    | EULAAcceptedChange ->
+        let updatedModel = {currentModel with EULAAccepted = not currentModel.EULAAccepted}
+        updatedModel,Cmd.none
+    | ShowEulaModal isVisible ->
+        let updatedModel = {currentModel with EULAModalVisible = isVisible}
+        updatedModel,Cmd.none
     | GenericError exn ->
         let updatedModel = {currentModel with HasError = true; ErrorState=Some exn}
         updatedModel,Cmd.none
@@ -533,6 +545,89 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
                 ]
             ]
         ]
+    ]
+
+let eulaModal (model:Model) (dispatch:Msg -> unit) =
+    Modal.modal [Modal.IsActive model.EULAModalVisible] [
+        Modal.background [] []
+        Modal.content [Props[Style[BackgroundColor "white"; Padding "1em 1em 1em 1em"; TextAlign TextAlignOptions.Justify]]] [
+            Heading.h5 [] [str "ACADEMIC SOFTWARE LICENSE AGREEMENT FOR END-USERS AT PUBLICLY FUNDED ACADEMIC, EDUCATION OR RESEARCH INSTITUTIONS FOR THE USE OF targetp and iMLP."]
+            p   [] [str """By accepting this License Agreement you are consenting to be bound by and become a party to this agreement as the "Licensee". If you do not agree to all of the terms of this agreement, you must not click the Acceptance button, nor use the product, and you do not become a LICENSEE under this agreement."""]
+            br  []
+            p   [] [str """If you are not a member of a publicly funded Academic and/or Education and/or Research Institution you must obtain a commercial license. This software license agreement is entered into by and between Technische Universität Kaiserslautern (hereinafter "LICENSOR") and the "LICENSEE"."""]
+            br  []
+            p   [] [str """WHEREAS LICENSEE is a public funded Academic and/or Education and/or Research Institution."""]
+            br  []
+            p   [] [str """WHEREAS LICENSEE desires to acquire a free non-exclusive license to use the Software for internal research purposes only."""]
+            br  []
+            p   [] [str """NOW, THEREFORE, in consideration of the mutual promises and covenants contained herein, the parties agree as follows:"""]
+            br  []
+            Heading.h6 [] [str "1. Definitions"]
+            p   [] [str """"Licensed Software" means the specific version targetp and iMLP pursuant to this Agreement. """]
+            br  []
+            Heading.h6 [] [str "2. License"]
+            p   [] [str """Subject to the terms and conditions of this Agreement a non-exclusive, non-transferable License to use and copy the Licensed Software is made available free of charge for the LICENSEE which is a non-profit educational, academic and/or research institution. The License is only granted for personal and internal use in research only at one Site, where a Site is defined as a set of contiguous buildings in one location. The software will be used at only one location of LICENSEE. """]
+            br  []
+            p   [] [str """This license does not entitle Licensee to receive from LICENSOR copies of the Licensed software on disks, tapes or CD's, hard-copy documentation, technical support, telephone assistance, or enhancements or updates to the Licensed Software. """]
+            br  []
+            p   [] [str """The user and any research assistants, co-workers or other workers who may use the Software agree to not give the program to third parties or grant licenses on software, which include the Software, alone or integrated into other software, to third parties. Modification of the source code is prohibited without the prior written consent of LICENSOR. """]
+            br  []
+            Heading.h6 [] [str "3. Ownership "]
+            p   [] [str """Except as expressly licensed in this Agreement, LICENSOR shall retain title to the Licensed Software, and any upgrades and modifications created by LICENSOR."""]
+            br  []
+            Heading.h6 [] [str "4. Consideration "]
+            p   [] [str """In consideration for the license rights granted by LICENSOR, LICENSEE will obtain this academic license free of charge. """]
+            br  []
+            Heading.h6 [] [str "5. Copies"] 
+            p   [] [str """ LICENSEE shall have the right to make copies of the Licensed Software for internal use at the Site and for back-up purposes under this Agreement, but agrees that all such copies shall contain the copyright notices and all other reasonable and appropriate proprietary markings or confidential legends that appear on the Licensed Software provided hereunder."""]
+            br  []
+            Heading.h6 [] [str "6. Support"] 
+            p   [] [ str """LICENSOR shall have no obligation to offer support services to LICENSEE, and nothing contained herein shall be interpreted as to require LICENSOR to provide maintenance, installation services, version updates, debugging, consultation or end-user support of any kind. """]
+            br  []
+            Heading.h6 [] [str "7. Software Protection"] 
+            p   [] [ str """LICENSEE acknowledges that the Licensed Software is proprietary The software code shall be treated as trade secrets and confidential information of LICENSOR, and LICENSEE agrees to use best efforts to hold the same in confidence. LICENSEE's obligation for confidentiality shall not extend to any information which is or becomes generally available to the public, is already known to or subsequently disclosed by third parties to LICENSEE and at its free disposal, or is independently developed by LICENSEE or its affiliates without the use of the confidential information disclosed by LICENSOR, or is required by law or legal process. """]
+            br  []
+            p   [] [ str """Except as other wise expressly permitted in this Agreement, Licensee my not (i) modify or create any derivative works of the Licensed Software or documentation, including customization, translation or localization; (ii) decompile, disassemble, reverse engineer, or otherwise attempt to derive the source code for the Product; (iii) redistribute, encumber, sell, rent, lease, sublicense, or otherwise transfer rights to the Licensed Software; (iv) remove or alter any trademark, logo, copyright or other proprietary notices, legends, symbols or labels in the Product; or (v) publish any results of benchmark tests run on the Product to a third party without LICENSOR's prior written consent. """]
+            br  []
+            Heading.h6 [] [str "8. Representations of LICENSOR to LICENSEE"] 
+            p   [] [ str """ LICENSOR represents to LICENSEE that (i) LICENSOR has the right to grant the License and to enter into this agreement, (ii) that, to the best of LICENSOR's knowledge, the Licensed software does not infringe any patent, copyright or trade secrets of any third party, provided however that such representation and warranty shall not apply to any addition to, or modifications or adaptation of, the Licensed Software made by LICENSEE and (iii) LICENSOR undertakes to use best efforts to cooperate with and assist LICENSEE, at LICENSEE's expense, in defending itself against any action based on the alleged infringement of any third party patent, copyright or trade secret rights resulting from or relating to the use or licensing of the Licensed Software by LICENSEE. """]
+            br  []
+            Heading.h6 [] [str "9. Indemnity and Disclaimer of Warranties"] 
+            p   [] [ str """Except as expressly set forth in this agreement, LICENSOR makes no representations or warranties, express or implied. """]
+            br  []
+            p   [] [ str """The product is provided free of charge, and, therefore, on an "as is" basis, without warranty of any kind, express or implied, including without limitation the warranties that it is free of defects, virus free, able to operate on an uninterrupted basis, merchantable, fit for a particular purpose or non-interfering. The entire risk as to the quality and performance of the Licensed Software is borne by LICENSEE."""]
+            br  []
+            p   [] [ str """By way of example, but not limitation, LICENSOR makes no representations or warranties of merchantability or fitness for any particular application or, except as set forth in paragraph 8, that the use of the Software will not infringe any patents, copyrights or trademarks or other rights of third parties. The entire risk as to the quality and performance of the product is borne by LICENSEE. LICENSOR shall not be liable for any liability or damages with respect to any claim by LICENSEE or any third party on account of, or arising from the license or use of the Software."""]
+            br  []
+            p   [] [ str """Should the Licensed Software prove defective in any respect, LICENSEE and not LICENSOR or its affiliates should assume the entire cost of any service and repair. This disclaimer of warranty constitutes an essential part of this agreement. No use of the licensed product is authorized hereunder except under this disclaimer."""]
+            br  []
+            p   [] [ str """In no event will LICENSOR or its affiliates be liable for any indirect, special, incidental or consequential damages arising out of the use of or inability to use the product, including, without limitation, damages for lost profits, loss of goodwill, work stoppage, computer failure or malfunction, or any and all other commercial damages or losses, even if advised of the possibility thereof, and regardless of the legal or equitable theory (contract, tort or otherwise) upon which the claim is based. """]
+            br  []
+            Heading.h6 [] [str "10. Promotional Advertising & References"]
+            p   [] [ str """LICENSEE may not use the name of the Licensed Software in its promotional advertising, product literature, and other similar promotional materials to be disseminated to the public or any portion thereof. LICENSEE agrees not to identify LICENSOR in any promotional advertising or other promotional materials to be disseminated to the public, or any portion thereof without LICENSOR's prior written consent."""]
+            br  []
+            Heading.h6 [] [str "11. Term "]
+            p   [] [ str """This Agreement and the license rights granted herein shall become effective as of the date this Agreement is executed by both parties and shall be perpetual unless terminated in accordance with this Section."""]
+            br  []
+            p   [] [ str """LICENSOR may terminate this Agreement at any time."""]
+            br  []
+            p   [] [ str """Either party may terminate this Agreement at any time effective upon the other party's breach of any agreement, covenant, or representation made in this Agreement, such breach remaining uncorrected sixty (60) days after written notice thereof."""]
+            br  []
+            p   [] [ str """LICENSEE shall have the right, at any time, to terminate this Agreement without cause by written notice to LICENSOR specifying the date of termination."""]
+            br  []
+            p   [] [ str """Upon termination, LICENSEE shall destroy all full and partial copies of the Licensed Software."""]
+            br  []
+            Heading.h6 [] [str "12. Governing Law"] 
+            p   [] [ str """This Agreement shall be construed in accordance with the laws of Germany."""]
+            br  []
+            Heading.h6 [] [str "13. General"]
+            p   [] [ str """The parties agree that this Agreement is the complete and exclusive agreement among the parties and supersedes all proposals and prior agreements whether written or oral, and all other communications among the parties relating to the subject matter of this Agreement. This Agreement cannot be modified except in writing and signed by both parties. Failure by either party at any time to enforce any of the provisions of this Agreement shall not constitute a waiver by such party of such provision nor in any way affect the validity of this Agreement.]"""]
+            br  []
+            p   [] [ str """The invalidity of singular provisions does not affect the validity of the entire understanding. The parties are obligated, however, to replace the invalid provisions by a regulation which comes closest to the economic intent of the invalid provision. The same shall apply mutatis mutandis in case of a gap."""]
+            br  []
+            p   [] [ str """IN WITNESS WHEREOF, the LICENSEE hereto have caused this Agreement to be duly executed on the date of accepting the license conditions by pressing the Acceptance button.""" ]
+        ]
+        Modal.close [Modal.Close.OnClick (fun _ -> ShowEulaModal false |> dispatch)] [str "close"]
     ]
 
 let createDropdown dropdownBtnText id children =
@@ -1123,16 +1218,22 @@ let validateInputState (model:Model) =
         | _ ->  match model.SelectedTargetPModel with
                 | NoModel   ->  false,"No model selected"
                 | _         ->  match model.HasValidFasta with
-                                | true -> true,"Start computation"
                                 | false -> false, "Fasta is invalid"
+                                | _ ->  if model.EULAAccepted then
+                                            true,"Start computation"
+                                        else
+                                            false,"Please accept the EULA to continue"
     |File -> 
         match model.FastaFileInput with
         |[||] -> false,"No data provided"
         | _ ->  match model.SelectedTargetPModel with
                 | NoModel   ->  false,"No model selected"
                 | _         ->  match model.HasValidFasta with
-                                | true -> true,"Start computation"
                                 | false -> false, "Fasta is invalid"
+                                | _ ->  if model.EULAAccepted then
+                                            true,"Start computation"
+                                        else
+                                            false,"Please accept the EULA to continue"
     |_ -> false,"No data provided"
 
 let targetPModelSelector (isTargetSelector: bool) (model : Model) (dispatch : Msg -> unit) =
@@ -1268,6 +1369,17 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                                 | _ -> ())
                         ] [str buttonMsg ]
                         br []
+                        Control.div [Control.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+                            Checkbox.checkbox [] [
+                                Checkbox.input [Props[OnClick (fun _ -> EULAAcceptedChange |> dispatch)]]
+                            ]
+                            str "I agree to iMLP's "
+                            a [ OnClick (fun _ -> ShowEulaModal true |> dispatch)
+                                Style [Color "white";]] [
+                                str "end user licence agreement (EULA)"
+                            ]
+                        ]
+                        br []
                         Heading.h5 [Heading.IsSubtitle; Heading.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [str "Select the model that is closest to your organism of interest and start the iMTS-L prediction:"]
                         Control.div [] [
                             Radio.radio [] [
@@ -1367,6 +1479,7 @@ let view (model : Model) (dispatch : Msg -> unit) =
     else
         div [][
             navbar model dispatch
+            eulaModal model dispatch
             displayHelpSection model dispatch
             hero model dispatch
             inputSelection model dispatch
