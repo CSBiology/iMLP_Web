@@ -1376,7 +1376,7 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                             str "I agree to iMLP's "
                             a [ OnClick (fun _ -> ShowEulaModal true |> dispatch)
                                 Style [Color "white";]] [
-                                str "end user licence agreement (EULA)"
+                                str "end user license agreement (EULA)"
                             ]
                         ]
                         br []
