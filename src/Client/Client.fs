@@ -1268,7 +1268,7 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                                 | _ -> ())
                         ] [str buttonMsg ]
                         br []
-                        Heading.h5 [Heading.IsSubtitle] [str "Select the model that is closest to your organism of interest and start the IMTS prediction:"]
+                        Heading.h5 [Heading.IsSubtitle; Heading.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [str "Select the model that is closest to your organism of interest and start the iMTS-L prediction:"]
                         Control.div [] [
                             Radio.radio [] [
                                 Radio.input
