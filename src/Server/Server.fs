@@ -296,13 +296,14 @@ let rand = new System.Random()
 let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
     let str = 
         [
-            yield ("Header","Sequence","iMTS-L_Propensity")
+            yield ("Header","Sequence","Raw_Scores","iMTS-L_Propensity")
             for r in res do
                 yield
                     (
                         r.Header,
                         r.Sequence,
-                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
+                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) "",
+                        r.Scores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
                     )
         ]
         |> Seq.toCSV "\t" false
@@ -393,6 +394,8 @@ let targetPApi = {
                     |> Seq.concat
                     |> Array.ofSeq
 
+                let smoothed = Propensity.smoothOnly 3 scores
+
                 //Cleanup
                 //dispose running container
                 BioContainer.disposeAsync tpContext
@@ -409,6 +412,7 @@ let targetPApi = {
                         Header              =   header
                         Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
                         Scores              =   scores
+                        SmoothedScores      =   smoothed
                         Propensity          =   propensity
                         PredictedIMTSL      =   Propensity.detectIMTSL propensity
                         PropensityPlotHtml  =   propensityPlot

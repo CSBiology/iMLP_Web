@@ -23,6 +23,7 @@ type TargetPResult = {
     Header              : string
     Sequence            : string
     Scores              : float array
+    SmoothedScores      : float array
     Propensity          : float array
     PredictedIMTSL      : IMTSL array
     PropensityPlotHtml  : string
