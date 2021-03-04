@@ -302,8 +302,8 @@ let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
                     (
                         r.Header,
                         r.Sequence,
-                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) "",
-                        r.Scores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
+                        r.Scores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) "",
+                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
                     )
         ]
         |> Seq.toCSV "\t" false
