@@ -5,6 +5,7 @@ open System.Net
 
 open Shared
 open TargetPServer
+open CNTKServer
 
 open Suave
 open Suave.Files
@@ -23,7 +24,6 @@ open FSharp.Plotly
 open BioFSharp.BioContainers
 open FSharpAux
 open Suave.Logging
-
 
 module Config =
 
@@ -329,27 +329,8 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
 
 let targetPApi = {
     SingleSequenceRequest = 
-        fun model single -> 
+        fun model mode single -> 
             async {
-
-                //set up parameters and Biocontainer + context
-                let targetModel = 
-                    match model with
-                    |Plant      -> TargetP.Plant
-                    |NonPlant   -> TargetP.NonPlant
-                    |_          -> failwithf "No model for targetP provided"
-
-                let client = Docker.connect "npipe://./pipe/docker_engine"
-                let tpContext = 
-                        BioContainer.initBcContextWithMountAsync
-                            client
-                            TargetP.ImageTargetP
-                            (
-                                @"Server\tmp"
-                                |> Paths.deploymentSpecificPath
-                            )
-                        |> Async.RunSynchronously
-
                 //read fasta item from input
                 let fastA =
                     if single.StartsWith(">") then
@@ -367,58 +348,102 @@ let targetPApi = {
                          
                 let header = fastA.[0].Header
 
-                //Save fasta to temporary container path
-                let splitSeqs =
-                    fastA.[0]
-                        |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
-                        |> singleSequenceToMany
+                let targetModel = 
+                    match model with
+                    |Plant      -> TargetP.Plant
+                    |NonPlant   -> TargetP.NonPlant
+                    |_          -> failwithf "No model for targetP provided"
+            
+                match mode with
+                | ComputationMode.TargetPBased ->
 
-                let paths =
-                    splitSeqs
-                    |> Seq.map
-                        (fun _ ->
-                            System.Threading.Thread.Sleep 10
-                            sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
-                            |> Paths.deploymentSpecificPath
-                        )
-                    |> Array.ofSeq
+                    //compute propensity based on computation mode
+                    //set up parameters and Biocontainer + context
+
+                    let client = Docker.connect "npipe://./pipe/docker_engine"
+                    let tpContext = 
+                            BioContainer.initBcContextWithMountAsync
+                                client
+                                TargetP.ImageTargetP
+                                (
+                                    @"Server\tmp"
+                                    |> Paths.deploymentSpecificPath
+                                )
+                            |> Async.RunSynchronously
+
+                    //Save fasta to temporary container path
+                    let splitSeqs =
+                        fastA.[0]
+                            |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
+                            |> singleSequenceToMany
+
+                    let paths =
+                        splitSeqs
+                        |> Seq.map
+                            (fun _ ->
+                                System.Threading.Thread.Sleep 10
+                                sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
+                                |> Paths.deploymentSpecificPath
+                            )
+                        |> Array.ofSeq
                     
-                splitSeqs
-                |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
+                    splitSeqs
+                    |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
 
-                //Run Biocontainer
-                let scores = 
-                    paths
-                    |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
-                    |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
-                    |> Seq.concat
-                    |> Array.ofSeq
+                    //Run Biocontainer
+                    let scores = 
+                        paths
+                        |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
+                        |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
+                        |> Seq.concat
+                        |> Array.ofSeq
 
-                let smoothed = Propensity.smoothOnly 3 scores
+                    let smoothed = Propensity.smoothOnly 3 scores
 
-                //Cleanup
-                //dispose running container
-                BioContainer.disposeAsync tpContext
-                |> Async.RunSynchronously
-                //delete temporary file
-                paths |> Array.iter File.Delete
+                    //Cleanup
+                    //dispose running container
+                    BioContainer.disposeAsync tpContext
+                    |> Async.RunSynchronously
+                    //delete temporary file
+                    paths |> Array.iter File.Delete
 
-                //return result
-                let scorePlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.TargetPScore "Raw TargetP Scores" scores
-                let propensity = Propensity.ofWindowed 3 scores
-                let propensityPlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.Propensity "iMTS-L propensity" propensity
+                    //return result
+                    let scorePlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.TargetPScore "Raw TargetP Scores" scores
+                    let propensity = Propensity.ofWindowed 3 scores
+                    let propensityPlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.Propensity "iMTS-L propensity" propensity
 
-                return {   
+                    return {
+                        Mode                =   mode
                         Header              =   header
                         Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
                         Scores              =   scores
                         SmoothedScores      =   smoothed
                         Propensity          =   propensity
+                        IMLPPropensity      =   [||]
                         PredictedIMTSL      =   Propensity.detectIMTSL propensity
                         PropensityPlotHtml  =   propensityPlot
                         ScorePlotHtml       =   scorePlot
-                        }
-                
+                    }
+                | ComputationMode.IMLP ->
+
+                    let imlpPropensity =
+                        fastA
+                        |> FastA.toString id
+                        |> String.concat ""
+                        |> CNTKServer.predictFinal
+
+                    return {
+                        Mode                =   mode
+                        Header              =   header
+                        Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
+                        Scores              =   [||]
+                        SmoothedScores      =   [||]
+                        Propensity          =   [||]
+                        IMLPPropensity      =   [||]
+                        PredictedIMTSL      =   [||]
+                        PropensityPlotHtml  =   PlotHelpers.plotFromScores PlotHelpers.PlotMode.TargetPScore "iMTS-L propensity" imlpPropensity
+                        ScorePlotHtml       =   ""
+                    }
 
                         
             }

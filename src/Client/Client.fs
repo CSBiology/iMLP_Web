@@ -174,6 +174,7 @@ type Model = {
     EULAModalVisible            :   bool
     BurgerVisible               :   bool
     SelectedTargetPModel        :   TargetPModel
+    SelectedComputationMode     :   ComputationMode
     SingleSequence              :   string
     SingleSequenceResult        :   TargetPResult Option
     FastaFileInput              :   string []
@@ -199,9 +200,10 @@ type Model = {
 let initialModel = {
     SessionGuid                 =   System.Guid.NewGuid()
     EULAAccepted                =   false
-    EULAModalVisible            =  false
+    EULAModalVisible            =   false
     BurgerVisible               =   false
     SelectedTargetPModel        =   TargetPModel.NonPlant
+    SelectedComputationMode     =   ComputationMode.IMLP
     SingleSequence              =   ""
     SingleSequenceResult        =   None
     FastaFileInput              =   [||]
@@ -285,7 +287,13 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     match msg with
     | Reset -> init ()
     | EULAAcceptedChange ->
-        let updatedModel = {currentModel with EULAAccepted = not currentModel.EULAAccepted}
+        let isAccepted = not currentModel.EULAAccepted
+        let computationMode = if isAccepted then ComputationMode.TargetPBased else ComputationMode.IMLP
+        let updatedModel = {
+            currentModel with
+                EULAAccepted = not currentModel.EULAAccepted
+                SelectedComputationMode = computationMode
+            }
         updatedModel,Cmd.none
     | ShowEulaModal isVisible ->
         let updatedModel = {currentModel with EULAModalVisible = isVisible}
@@ -378,7 +386,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 }
         let requestCmd = 
             Cmd.OfAsync.either
-                (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel)
+                (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel currentModel.SelectedComputationMode)
                 currentModel.SingleSequence
                 (Ok >> SingleSequenceResponse)
                 (Error >> SingleSequenceResponse)
@@ -397,7 +405,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let requestCmd =
             if processIndex < fileLength then
                 Cmd.OfAsync.either
-                    (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel)
+                    (Server.targetPApi.SingleSequenceRequest currentModel.SelectedTargetPModel currentModel.SelectedComputationMode)
                     currentModel.FastaFileInput.[processIndex]
                     (Ok >> FastaUploadResponse)
                     (Error >> FastaUploadResponse)
@@ -1096,7 +1104,7 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
             plotModeSwitch model dispatch
             hr []
             Heading.h4 [] [
-                if model.PlotMode = Propensity then
+                if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
                     yield str "iMTS-L propensity heatmap:"
                 else
                     yield str "Raw TargetP sequence score heatmap:"
@@ -1109,13 +1117,20 @@ let singleResult (model : Model) (dispatch: Msg -> unit) (res: TargetPResult) =
                     |> Array.map (fun x -> [|x.StartIndex .. x.EndIndex|])
                     |> Array.concat
                 )
-                (if model.PlotMode = Propensity then res.Propensity else res.Scores)
+                (
+                    if model.SelectedComputationMode = ComputationMode.IMLP then
+                        res.IMLPPropensity
+                    elif model.PlotMode = Propensity then
+                        res.Propensity
+                    else
+                        res.Scores
+                )
             hr []
-            Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
+            Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
             iframe [
                 Props.SrcDoc
                     (
-                        if model.PlotMode = Propensity then
+                        if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
                             res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
                         else
                             res.ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
@@ -1220,9 +1235,9 @@ let validateInputState (model:Model) =
                 | _         ->  match model.HasValidFasta with
                                 | false -> false, "Fasta is invalid"
                                 | _ ->  if model.EULAAccepted then
-                                            true,"Start computation"
+                                            true,"Start legacy computation"
                                         else
-                                            false,"Please accept the EULA to continue"
+                                            true,"Start computation"
     |File -> 
         match model.FastaFileInput with
         |[||] -> false,"No data provided"
@@ -1231,9 +1246,9 @@ let validateInputState (model:Model) =
                 | _         ->  match model.HasValidFasta with
                                 | false -> false, "Fasta is invalid"
                                 | _ ->  if model.EULAAccepted then
-                                            true,"Start computation"
+                                            true,"Start legacy computation"
                                         else
-                                            false,"Please accept the EULA to continue"
+                                            true,"Start computation"
     |_ -> false,"No data provided"
 
 let targetPModelSelector (isTargetSelector: bool) (model : Model) (dispatch : Msg -> unit) =
@@ -1373,7 +1388,7 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                             Checkbox.checkbox [] [
                                 Checkbox.input [Props[OnClick (fun _ -> EULAAcceptedChange |> dispatch)]]
                             ]
-                            str "I agree to iMLP's "
+                            str "Use legacy computation model - in order to use the legacy computation model I agree to iMLP's "
                             a [ OnClick (fun _ -> ShowEulaModal true |> dispatch)
                                 Style [Color "white";]] [
                                 str "end user license agreement (EULA)"

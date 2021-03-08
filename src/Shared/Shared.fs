@@ -12,6 +12,10 @@ type TargetPModel =
 |Plant
 |NonPlant
 
+type ComputationMode =
+| TargetPBased
+| IMLP
+
 //Start and end indices 0 based!
 type IMTSL = {
     StartIndex: int
@@ -20,11 +24,13 @@ type IMTSL = {
 }
 
 type TargetPResult = {
+    Mode                : ComputationMode
     Header              : string
     Sequence            : string
     Scores              : float array
     SmoothedScores      : float array
     Propensity          : float array
+    IMLPPropensity      : float array
     PredictedIMTSL      : IMTSL array
     PropensityPlotHtml  : string
     ScorePlotHtml       : string
@@ -34,7 +40,7 @@ type TargetPResult = {
 /// to learn more, read the docs at https://zaid-ajaj.github.io/Fable.Remoting/src/basics.html
 
 type ITargetPApi = {
-    SingleSequenceRequest : TargetPModel -> string -> Async<TargetPResult>
+    SingleSequenceRequest : TargetPModel -> ComputationMode -> string -> Async<TargetPResult>
     //FastaFileRequest : TargetPModel -> string -> Async<TargetPResult array>
     DownloadRequestSingle: TargetPResult*System.Guid -> Async<unit>
     DownloadRequestMultiple: TargetPResult array * System.Guid -> Async<unit>
