@@ -9,3 +9,4 @@ group Server
     FSharpAux.IO
     FSharp.Plotly
     FSharp.Stats
+    CNTK.CPUOnly

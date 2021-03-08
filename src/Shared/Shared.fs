@@ -13,35 +13,39 @@ type TargetPModel =
 |NonPlant
 
 type ComputationMode =
-| TargetPBased
+| Legacy
 | IMLP
 
-//Start and end indices 0 based!
-type IMTSL = {
-    StartIndex: int
-    EndIndex: int
-    ScoreSum : float
+
+type LegacyResult = {
+    Header                  : string
+    Sequence                : string
+    RawTargetPScores        : float array
+    SmoothedTargetPScores   : float array
+    PropensityScores        : float array
+    PropensityPlotHtml      : string
+    ScorePlotHtml           : string
 }
 
-type TargetPResult = {
-    Mode                : ComputationMode
+type IMLPResult = {
     Header              : string
     Sequence            : string
-    Scores              : float array
-    SmoothedScores      : float array
-    Propensity          : float array
-    IMLPPropensity      : float array
-    PredictedIMTSL      : IMTSL array
+    PropensityScores    : float array
     PropensityPlotHtml  : string
-    ScorePlotHtml       : string
 }
 
 /// A type that specifies the communication protocol between client and server
 /// to learn more, read the docs at https://zaid-ajaj.github.io/Fable.Remoting/src/basics.html
 
 type ITargetPApi = {
-    SingleSequenceRequest : TargetPModel -> ComputationMode -> string -> Async<TargetPResult>
-    //FastaFileRequest : TargetPModel -> string -> Async<TargetPResult array>
-    DownloadRequestSingle: TargetPResult*System.Guid -> Async<unit>
-    DownloadRequestMultiple: TargetPResult array * System.Guid -> Async<unit>
+
+    // Legacy model
+    SingleSequenceRequestLegacy : string -> Async<LegacyResult>
+    DownloadRequestSingleLegacy: LegacyResult*System.Guid -> Async<unit>
+    DownloadRequestMultipleLegacy: LegacyResult array * System.Guid -> Async<unit>
+
+    //iMLP model
+    SingleSequenceRequestIMLP : string -> Async<IMLPResult>
+    DownloadRequestSingleIMLP: IMLPResult*System.Guid -> Async<unit>
+    DownloadRequestMultipleIMLP: IMLPResult array * System.Guid -> Async<unit>
 }

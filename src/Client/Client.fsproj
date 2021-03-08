@@ -1,6 +1,7 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <Platforms>x64</Platforms>
         <TargetFramework>netstandard2.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
@@ -8,6 +9,11 @@
         <None Include="index.html" />
         <None Include="paket.references" />
         <Compile Include="..\Shared\Shared.fs" />
+        <Compile Include="JSInterop.fs" />
+        <Compile Include="AppModel.fs" />
+        <Compile Include="StateHandling.fs" />
+        <Compile Include="GenericViewComponents.fs" />
+        <Compile Include="ResultViews.fs" />
         <Compile Include="Client.fs" />
     </ItemGroup>
     <Import Project="..\..\.paket\Paket.Restore.targets" />

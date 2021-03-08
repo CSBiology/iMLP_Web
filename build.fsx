@@ -70,13 +70,13 @@ Target.create "InstallClient" (fun _ ->
 )
 
 Target.create "Build" (fun _ ->
-    runDotNet "build" serverPath
+    runDotNet "build --runtime win10-x64 --configuration x64" serverPath
     runTool yarnTool "webpack-cli -p" __SOURCE_DIRECTORY__
 )
 
 Target.create "Run" (fun _ ->
     let server = async {
-        runDotNet "watch run" serverPath
+        runDotNet "watch run --runtime win10-x64 --configuration x64" serverPath
     }
     let client = async {
         runTool yarnTool "webpack-dev-server" __SOURCE_DIRECTORY__

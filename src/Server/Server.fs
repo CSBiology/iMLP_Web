@@ -120,46 +120,6 @@ module Propensity =
                     Array.foldSub (+) 0.0 pfArr (i-n) (i+n) / arrSize
             )
 
-    //maybe refactor this for seq and push to FSharpAux
-    let private groupWhile (predicate:'a -> bool) (input:seq<'a>) =
-        let tmp = Seq.toList input
-        let rec group l g acc =
-            match l with
-            |h::t -> 
-                if predicate h then
-                    group t (h :: g) acc
-                else 
-                    if g.Length > 0 then
-                        group t [] ((List.rev g) :: acc)
-                    else
-                        group t [] acc
-            |_ ->
-                List.rev acc
-        let rec loop l =
-            match l with
-                |h::t -> 
-                    if predicate h then
-                        group t [h] []
-                    else 
-                        loop t
-                |_ -> []
-        loop tmp
-
-    let detectIMTSL (propensityProfile: float []) =
-        propensityProfile
-        |> Array.indexed
-        |> groupWhile (fun x -> (snd x > 0.))
-        |> List.map
-            (fun imtsl ->
-                {
-                    StartIndex = imtsl.Head |> fst
-                    EndIndex = imtsl |> List.last |> fst
-                    ScoreSum = imtsl |> List.sumBy snd 
-                }
-            )
-        |> Array.ofList
-
-
 module PlotHelpers =
 
     type PlotMode =
@@ -215,43 +175,38 @@ module PlotHelpers =
 
     let csbOrange = FSharpAux.Colors.fromRgb 237 125 49
 
-    let plotFromScores (mode:PlotMode) (name:string) (scores: float array) =
-        let vals = 
-            scores
-            |> Array.mapi (fun i x -> (i+1,x))
+    let plotPropensity (name:string) (propensityScores: float array) =
 
-        let plot =
-            match mode with
-            |Propensity ->
-                [
-                    Chart.SplineArea(vals,Color = "rgb(237, 125, 49, 0.9)",Name = "Propensity Score",Width = 2.5)
-            
-                ]
-                |> Chart.Combine
-                |> Chart.withY_Axis(xAxis "Score" true)
-                |> Chart.withX_Axis(yAxis "Index of AminoAcid")
-                |> Chart.withTitle(sprintf "%s" name)
-                |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
-                |> Chart.withSize(600.,600.)
-            |TargetPScore ->
-                let smoothed =
-                    Propensity.smoothOnly 3 scores
-                    |> Array.mapi (fun i x -> (i+1,x)) 
-                [
-                    Chart.Spline(smoothed,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "smoothed",Width = 2.5)
-                    Chart.Column(vals,Color = "rgba(68, 84, 106, 0.85)",Name = "raw TargetP score")
-            
-                ]
-                |> Chart.Combine
-                |> Chart.withY_Axis(xAxis "Score" false)
-                |> Chart.withY_AxisStyle("Score",MinMax=(0.,1.2))
-                |> Chart.withX_Axis(yAxis "Index of AminoAcid")
-                |> Chart.withTitle(sprintf "%s" name)
-                |> Chart.withLayout (layout ())
-                |> Chart.withSize(600.,600.)
-                
+        let vals = propensityScores |> Array.mapi (fun i x -> (i+1,x))
 
-        GenericChart.toEmbeddedHTML plot
+        Chart.SplineArea(vals,Color = "rgb(237, 125, 49, 0.9)",Name = "Propensity Score",Width = 2.5)
+        |> Chart.withY_Axis(xAxis "Score" true)
+        |> Chart.withX_Axis(yAxis "Index of AminoAcid")
+        |> Chart.withTitle(sprintf "%s" name)
+        |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
+        |> Chart.withSize(600.,600.)
+        |> GenericChart.toEmbeddedHTML
+
+    let plotRawTargetPScores (name:string) (rawScores: float array) =
+
+        let vals = rawScores |> Array.mapi (fun i x -> (i+1,x))
+
+        let smoothed =
+            Propensity.smoothOnly 3 rawScores
+            |> Array.mapi (fun i x -> (i+1,x)) 
+        [
+            Chart.Spline(smoothed,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "smoothed",Width = 2.5)
+            Chart.Column(vals,Color = "rgba(68, 84, 106, 0.85)",Name = "raw TargetP score")
+            
+        ]
+        |> Chart.Combine
+        |> Chart.withY_Axis(xAxis "Score" false)
+        |> Chart.withY_AxisStyle("Score",MinMax=(0.,1.2))
+        |> Chart.withX_Axis(yAxis "Index of AminoAcid")
+        |> Chart.withTitle(sprintf "%s" name)
+        |> Chart.withLayout (layout ())
+        |> Chart.withSize(600.,600.)
+        |> GenericChart.toEmbeddedHTML
 
 module ServerPath =
     let workingDirectory =
@@ -268,6 +223,10 @@ let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" 
 let publicPath = ServerPath.resolve [".."; "Client"; "public"]
 let port = tryGetEnv "HTTP_PLATFORM_PORT" |> Option.map System.UInt16.Parse |> Option.defaultValue 8085us
 
+let deleteTempFiles () = 
+    let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
+    for f in (System.IO.DirectoryInfo(path).GetFiles())
+        do if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then File.Delete(f.FullName)
 
 let loggingOptions =
   { Literate.LiterateOptions.create() with
@@ -293,17 +252,37 @@ let config =
 
 let rand = new System.Random()
 
-let targetPResultsToCsv (res: seq<TargetPResult>) (id : System.Guid) =
+let legacyResultsToCsv (res: seq<LegacyResult>) (id : System.Guid) =
     let str = 
         [
-            yield ("Header","Sequence","Raw_Scores","iMTS-L_Propensity")
+            yield ("Header","Sequence","Raw_TargetP_Scores","iMTS-L_Propensity_Scores")
             for r in res do
                 yield
                     (
                         r.Header,
                         r.Sequence,
-                        r.Scores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) "",
-                        r.Propensity |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
+                        r.RawTargetPScores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) "",
+                        r.PropensityScores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
+                    )
+        ]
+        |> Seq.toCSV "\t" false
+    str
+    |> Seq.write
+        (
+            sprintf @"Client/public/CsvResults/%s.txt" (id.ToString())
+            |> Paths.deploymentSpecificPath
+        )
+
+let iMLPResultsToCsv (res: seq<IMLPResult>) (id : System.Guid) =
+    let str = 
+        [
+            yield ("Header","Sequence","iMTS-L_Propensity_Scores")
+            for r in res do
+                yield
+                    (
+                        r.Header,
+                        r.Sequence,
+                        r.PropensityScores |> Array.fold (fun acc elem -> if acc = "" then string elem else sprintf "%s; %f" acc elem) ""
                     )
         ]
         |> Seq.toCSV "\t" false
@@ -328,155 +307,154 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
 
 
 let targetPApi = {
-    SingleSequenceRequest = 
-        fun model mode single -> 
-            async {
-                //read fasta item from input
-                let fastA =
-                    if single.StartsWith(">") then
-                        single
-                        |> fun x -> x.Replace("\r\n","\n")
-                        |> String.split '\n'
-                        |> FastA.fromFileEnumerator id
-                        |> Array.ofSeq
-                    else
-                        sprintf ">No Header Provided\n%s" single
-                        |> fun x -> x.Replace("\r\n","\n")
-                        |> String.split '\n'
-                        |> FastA.fromFileEnumerator id
-                        |> Array.ofSeq
+    SingleSequenceRequestLegacy = fun single -> async {
+        //read fasta item from input
+        let fastA =
+            if single.StartsWith(">") then
+                single
+                |> fun x -> x.Replace("\r\n","\n")
+                |> String.split '\n'
+                |> FastA.fromFileEnumerator id
+                |> Array.ofSeq
+            else
+                sprintf ">No Header Provided\n%s" single
+                |> fun x -> x.Replace("\r\n","\n")
+                |> String.split '\n'
+                |> FastA.fromFileEnumerator id
+                |> Array.ofSeq
                          
-                let header = fastA.[0].Header
+        let header = fastA.[0].Header
 
-                let targetModel = 
-                    match model with
-                    |Plant      -> TargetP.Plant
-                    |NonPlant   -> TargetP.NonPlant
-                    |_          -> failwithf "No model for targetP provided"
+        let targetModel = TargetP.Plant
+
             
-                match mode with
-                | ComputationMode.TargetPBased ->
+            //compute propensity based on computation mode
+            //set up parameters and Biocontainer + context
 
-                    //compute propensity based on computation mode
-                    //set up parameters and Biocontainer + context
+        let client = Docker.connect "npipe://./pipe/docker_engine"
+        let tpContext = 
+                BioContainer.initBcContextWithMountAsync
+                    client
+                    TargetP.ImageTargetP
+                    (
+                        @"Server\tmp"
+                        |> Paths.deploymentSpecificPath
+                    )
+                |> Async.RunSynchronously
 
-                    let client = Docker.connect "npipe://./pipe/docker_engine"
-                    let tpContext = 
-                            BioContainer.initBcContextWithMountAsync
-                                client
-                                TargetP.ImageTargetP
-                                (
-                                    @"Server\tmp"
-                                    |> Paths.deploymentSpecificPath
-                                )
-                            |> Async.RunSynchronously
+        //Save fasta to temporary container path
+        let splitSeqs =
+            fastA.[0]
+                |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
+                |> singleSequenceToMany
 
-                    //Save fasta to temporary container path
-                    let splitSeqs =
-                        fastA.[0]
-                            |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
-                            |> singleSequenceToMany
-
-                    let paths =
-                        splitSeqs
-                        |> Seq.map
-                            (fun _ ->
-                                System.Threading.Thread.Sleep 10
-                                sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
-                                |> Paths.deploymentSpecificPath
-                            )
-                        |> Array.ofSeq
+        let paths =
+            splitSeqs
+            |> Seq.map
+                (fun _ ->
+                    System.Threading.Thread.Sleep 10
+                    sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
+                    |> Paths.deploymentSpecificPath
+                )
+            |> Array.ofSeq
                     
-                    splitSeqs
-                    |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
+        splitSeqs
+        |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
 
-                    //Run Biocontainer
-                    let scores = 
-                        paths
-                        |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
-                        |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
-                        |> Seq.concat
-                        |> Array.ofSeq
+        //Run Biocontainer
+        let scores = 
+            paths
+            |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
+            |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
+            |> Seq.concat
+            |> Array.ofSeq
 
-                    let smoothed = Propensity.smoothOnly 3 scores
+        let smoothed = Propensity.smoothOnly 3 scores
 
-                    //Cleanup
-                    //dispose running container
-                    BioContainer.disposeAsync tpContext
-                    |> Async.RunSynchronously
-                    //delete temporary file
-                    paths |> Array.iter File.Delete
+        //Cleanup
+        //dispose running container
+        BioContainer.disposeAsync tpContext
+        |> Async.RunSynchronously
+        //delete temporary file
+        paths |> Array.iter File.Delete
 
-                    //return result
-                    let scorePlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.TargetPScore "Raw TargetP Scores" scores
-                    let propensity = Propensity.ofWindowed 3 scores
-                    let propensityPlot = PlotHelpers.plotFromScores PlotHelpers.PlotMode.Propensity "iMTS-L propensity" propensity
+        //return result
+        let scorePlot = PlotHelpers.plotRawTargetPScores "Raw TargetP Scores" scores
+        let propensity = Propensity.ofWindowed 3 scores
+        let propensityPlot = PlotHelpers.plotPropensity "iMTS-L propensity" propensity
 
-                    return {
-                        Mode                =   mode
-                        Header              =   header
-                        Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
-                        Scores              =   scores
-                        SmoothedScores      =   smoothed
-                        Propensity          =   propensity
-                        IMLPPropensity      =   [||]
-                        PredictedIMTSL      =   Propensity.detectIMTSL propensity
-                        PropensityPlotHtml  =   propensityPlot
-                        ScorePlotHtml       =   scorePlot
-                    }
-                | ComputationMode.IMLP ->
+        return {
+            Header                  =   header
+            Sequence                =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
+            RawTargetPScores        =   scores
+            SmoothedTargetPScores   =   smoothed
+            PropensityScores        =   propensity
+            PropensityPlotHtml      =   propensityPlot
+            ScorePlotHtml           =   scorePlot
+        }
+    }
 
-                    let imlpPropensity =
-                        fastA
-                        |> FastA.toString id
-                        |> String.concat ""
-                        |> CNTKServer.predictFinal
+    SingleSequenceRequestIMLP =
+        fun single -> async {
+            //read fasta item from input
+            let fastA =
+                if single.StartsWith(">") then
+                    single
+                    |> fun x -> x.Replace("\r\n","\n")
+                    |> String.split '\n'
+                    |> FastA.fromFileEnumerator id
+                    |> Array.ofSeq
+                else
+                    sprintf ">No Header Provided\n%s" single
+                    |> fun x -> x.Replace("\r\n","\n")
+                    |> String.split '\n'
+                    |> FastA.fromFileEnumerator id
+                    |> Array.ofSeq
+                     
+            let header = fastA.[0].Header
 
-                    return {
-                        Mode                =   mode
-                        Header              =   header
-                        Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
-                        Scores              =   [||]
-                        SmoothedScores      =   [||]
-                        Propensity          =   [||]
-                        IMLPPropensity      =   [||]
-                        PredictedIMTSL      =   [||]
-                        PropensityPlotHtml  =   PlotHelpers.plotFromScores PlotHelpers.PlotMode.TargetPScore "iMTS-L propensity" imlpPropensity
-                        ScorePlotHtml       =   ""
-                    }
+            let fastaString =
+                fastA
+                |> Seq.item 0
+                |> fun x -> x.Sequence
+                |> Array.ofSeq
+                |> String.fromCharArray
 
-                        
+            let imlpPropensity =
+                fastaString
+                |> CNTKServer.predictFinal
+
+            return {
+                Header              =   header
+                Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
+                PropensityScores    =   imlpPropensity
+                PropensityPlotHtml  =   PlotHelpers.plotPropensity "iMTS-L propensity" imlpPropensity
             }
+        }
 
-    DownloadRequestSingle = 
-        fun (res,id)-> 
-            async { 
-                    for f in
-                        (
-                            let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
-                            System.IO.DirectoryInfo(path).GetFiles()
-                        )
-                        do
-                            if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then
-                                File.Delete(f.FullName)
-                    targetPResultsToCsv [res] id
-                    return ()
-                    }
+    DownloadRequestSingleLegacy = fun (res,id) -> async {
+        deleteTempFiles()
+        legacyResultsToCsv [res] id
+        return ()
+    }
 
-    DownloadRequestMultiple = 
-        fun (res,id) -> 
-            async {
-                    for f in
-                        (
-                            let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
-                            System.IO.DirectoryInfo(path).GetFiles()
-                        )
-                        do
-                            if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then
-                                File.Delete(f.FullName)
-                    targetPResultsToCsv res id
-                    return ()
-                    }
+    DownloadRequestSingleIMLP = fun (res,id) -> async { 
+        deleteTempFiles()
+        iMLPResultsToCsv [res] id
+        return ()
+    }
+
+    DownloadRequestMultipleLegacy = fun (res,id) -> async {
+        deleteTempFiles()
+        legacyResultsToCsv res id
+        return ()
+    }
+
+    DownloadRequestMultipleIMLP = fun (res,id) -> async {
+        deleteTempFiles()
+        iMLPResultsToCsv res id
+        return ()
+    }
 }
 
 open System
