@@ -192,18 +192,12 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             ]
             br []
             Heading.h4 [] [str "Technical Details   "]
-            br []
-            str "This service uses a server-side nested virtualization procedure to enable querying a targetP docker container."
-            br []
-            br []
-            str "Nested in this case means that the host machine, which itself is a windows server virtual machine running on a HyperV cluster acts itself as a host for the docker demon."
-            br []
-            str "This enables the realisation of OS-agnostic services, here the calling of targetP - a command line tool usually only available to unix host machines."
+            str "iMLP is based on the long short-term memory (LSTM) recurrent neural network architecture. These architectures are specially designed for feature detection in sequences and therefore well suited for the recognition of iMTS-Ls. The network is built and consumed using"
+            a [Href "https://docs.microsoft.com/en-us/cognitive-toolkit/"] [str " CNTK."]
             br []
             br []
-            str "We designed a F# library - "
-            a [Props.Href "https://github.com/CSBiology/BioFSharp/tree/master/src/BioFSharp.BioContainers"] [str "BioFSharp.BioContainers"]
-            str " - to reliably run docker tasks from the .NET environment, therefore making dockerized non-windows applications available for the F# ecosystem."
+            str "Additionally to the LSTM network, we also provide the algorithm that produces the profiles the network was trained on. Coined 'Legacy model' in the UI, this approach uses TargetP to predict MTS probability of each sequence position and calculates the iMTS-L propensity score based on these values (for more info, check above papers.). This is naturally way slower than using the network to predic iMTS-Ls, but may be of interest if you are interested in the raw positional TargetP scores aswell."
+            br []
         ]
     |Contact        ->
         [
@@ -265,8 +259,11 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                     str "Format:"
                     pre [] [
                         str
-                            "\"Header\"\t\"Sequence\"\t\"Scores\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
+                            "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
                     ]
+                    br []
+                    str "if the legacy model based on raw TargetP scores was used, the output has an additional column named \"Raw_TargetP_Scores\"."
+                    br []
                     br []
                     str "Once you generated the link, press on the download button to start the download."
                     br[]

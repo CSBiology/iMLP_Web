@@ -126,6 +126,14 @@ module PlotHelpers =
     |Propensity
     |TargetPScore
 
+    let config =
+        Config.init (
+            Responsive = true,
+            ToImageButtonOptions = ToImageButtonOptions.init(
+                StyleParam.ImageFormat.SVG
+            )
+        )
+
     let xAxis title (zeroline : bool)=
         Axis.LinearAxis.init
             (
@@ -185,6 +193,7 @@ module PlotHelpers =
         |> Chart.withTitle(sprintf "%s" name)
         |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
         |> Chart.withSize(600.,600.)
+        |> Chart.withConfig config
         |> GenericChart.toEmbeddedHTML
 
     let plotRawTargetPScores (name:string) (rawScores: float array) =
@@ -206,6 +215,7 @@ module PlotHelpers =
         |> Chart.withTitle(sprintf "%s" name)
         |> Chart.withLayout (layout ())
         |> Chart.withSize(600.,600.)
+        |> Chart.withConfig config
         |> GenericChart.toEmbeddedHTML
 
 module ServerPath =
