@@ -108,7 +108,7 @@ Target.create "Bundle" (fun _ ->
     let serverDir = Path.combine deployDir "Server"
     let clientDir = Path.combine deployDir "Client"
     let publicDir = Path.combine clientDir "public"
-    let publishArgs = sprintf "publish -c Release -o \"%s\"" serverDir
+    let publishArgs = sprintf "publish --runtime win10-x64 --configuration x64 -o \"%s\"" serverDir
     runDotNet publishArgs serverPath
 
     // read and transform web.config, removing aspNetCore generated info
