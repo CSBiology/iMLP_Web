@@ -490,6 +490,7 @@ let hero (model : Model) (dispatch : Msg -> unit) =
                     str " section." 
                     ]
             ]
+            Button.button [Button.OnClick (fun _ -> GenericError (System.Exception()) |> dispatch)] [str "test exception page"]
         ]
     ]
 
@@ -501,26 +502,19 @@ let errorDisplay (model : Model) (dispatch : Msg -> unit) =
                       | _ -> ex.Message,ex.StackTrace
         | None      -> "Unexpected Error","App failed without Exception message"
     Section.section [Section.CustomClass "ErrorSection"] [
-        Heading.h1 []
-            [
-            Icon.icon [Icon.IsRight; Icon.Size IsLarge] [Fa.i [Fa.Solid.SkullCrossbones] []]
-            str "Oopsie!"
-            Icon.icon [Icon.IsRight; Icon.Size IsLarge] [Fa.i [Fa.Solid.SkullCrossbones] []]
-            ]
         Heading.h2 [] [str "An error occured. Click the button below to reset the app state:"]
-        Button.button [Button.CustomClass "is-danger resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
+        Button.button [Button.CustomClass "is-warning resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
         br []
         br []
         Heading.h3 [] [str "If you are a developer and/or interested in the stack trace you can see the error message below."]
         br []
-        Content.content [] [
-            Dropdown.dropdown [] [
-                Dropdown.trigger [] []
-                Dropdown.content [] [
-                    Heading.h3 [] [str msg]
-                    Heading.h3 [] [str "StackTrace:"]
-                    Heading.h5 [] [str stackTrace]
-                ]
+        Button.button [Button.Color IsInfo; Button.OnClick (fun _ -> ChangeErrorStateVisibility |> dispatch)] [str "toggle stack trace"]
+        br []
+        Content.content [Content.Props [Hidden (not model.ShowErrorStack)]] [
+            div [Class "block"] [ Heading.h5 [] [str msg]]
+            div [Class "block"] [ Heading.h5 [] [str "StackTrace:"]]
+            div [Class "block"] [
+                pre [] [str stackTrace ]
             ]
         ]
     ]

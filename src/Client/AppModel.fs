@@ -56,6 +56,7 @@ type Model = {
     InformationSectionDisplay   :   DisplayHelp
     HasError                    :   bool
     ErrorState                  :   exn Option
+    ShowErrorStack              :   bool
     PlotMode                    :   PlotMode
 } with
 
@@ -134,6 +135,7 @@ let initialModel = {
     InformationSectionDisplay   =   NoHelp
     HasError                    =   false
     ErrorState                  =   None
+    ShowErrorStack              =   false
     PlotMode                    =   Propensity
 }
 
@@ -144,7 +146,6 @@ type Msg =
 | ToggleBurger
 | EULAAcceptedChange
 | ShowEulaModal                     of bool
-| TargetPModelSelection             of TargetPModel
 | SeqModeSelection                  of Mode
 | FastaUploadInput                  of string*string
 | SingleSequenceInput               of string
@@ -167,4 +168,5 @@ type Msg =
 | ChangeHelpDisplay                 of DisplayHelp
 | FastaValidation                   of Result<string,char list>
 | GenericError                      of exn
+| ChangeErrorStateVisibility
 | ChangePlotMode                    of PlotMode

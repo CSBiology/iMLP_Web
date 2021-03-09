@@ -56,6 +56,9 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
     | GenericError exn ->
         let updatedModel = {currentModel with HasError = true; ErrorState=Some exn}
         updatedModel,Cmd.none
+    | ChangeErrorStateVisibility ->
+        let updatedModel = {currentModel with ShowErrorStack = not currentModel.ShowErrorStack}
+        updatedModel,Cmd.none
     | ChangePlotMode pm ->
         let updatedModel = {currentModel with PlotMode = pm}
         updatedModel,Cmd.none
