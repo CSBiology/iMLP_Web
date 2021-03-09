@@ -490,7 +490,6 @@ let hero (model : Model) (dispatch : Msg -> unit) =
                     str " section." 
                     ]
             ]
-            Button.button [Button.OnClick (fun _ -> GenericError (System.Exception()) |> dispatch)] [str "test exception page"]
         ]
     ]
 
