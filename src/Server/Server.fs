@@ -40,7 +40,7 @@ module Paths =
     open Config
 
     [<Literal>]
-    let local = @"C:\Users\Kevin\source\repos\kMutagene\TargetPService\src"
+    let local = @"C:\Users\schne\source\repos\kMutagene\TargetPService\src"
 
     [<Literal>]
     let server = @"C:\SafeApps\TargetPService\deploy"
@@ -332,10 +332,9 @@ let targetPApi = {
                 |> String.split '\n'
                 |> FastA.fromFileEnumerator id
                 |> Array.ofSeq
-                         
         let header = fastA.[0].Header
 
-        let targetModel = TargetP.Plant
+        let targetModel = TargetP.NonPlant
 
             
             //compute propensity based on computation mode
@@ -345,7 +344,7 @@ let targetPApi = {
         let tpContext = 
                 BioContainer.initBcContextWithMountAsync
                     client
-                    TargetP.ImageTargetP
+                    (Docker.ImageId "targetp:1.1")
                     (
                         @"Server\tmp"
                         |> Paths.deploymentSpecificPath

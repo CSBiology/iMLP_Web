@@ -123,25 +123,23 @@ open ResultViews
 //    ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
-    if model.HasError then
-        GenericViewComponents.errorDisplay model dispatch
-    else
-        div [][
-            navbar model dispatch
-            eulaModal model dispatch
-            displayHelpSection model dispatch
-            hero model dispatch
-            inputSelection model dispatch
-            ResultViews.ViewComponents.resultHeading model dispatch 
-            ResultViews.CompositeViews.resultSection model dispatch
-            Footer.footer [] [
-                Content.content [] [
-                    str "This service is developed and maintained by the "
-                    a [Props.Href "https://csb.bio.uni-kl.de/"] [str "Computational Systems Biology department "]
-                    str "of the TU Kaiserslautern, Germany."
-                ]
+    div [][
+        navbar model dispatch
+        errorModal true model dispatch
+        eulaModal model dispatch
+        displayHelpModal model dispatch
+        hero model dispatch
+        inputSelection model dispatch
+        ResultViews.ViewComponents.resultHeading model dispatch 
+        ResultViews.CompositeViews.resultSection model dispatch
+        Footer.footer [] [
+            Content.content [] [
+                str "This service is developed and maintained by the "
+                a [Props.Href "https://csb.bio.uni-kl.de/"] [str "Computational Systems Biology department "]
+                str "of the TU Kaiserslautern, Germany."
             ]
         ]
+    ]
 
 #if DEBUG
 open Elmish.Debug

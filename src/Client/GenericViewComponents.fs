@@ -82,7 +82,7 @@ let navbar (model : Model) (dispatch : Msg -> unit) =
 let eulaModal (model:Model) (dispatch:Msg -> unit) =
     Modal.modal [Modal.IsActive model.EULAModalVisible] [
         Modal.background [] []
-        Modal.content [Props[Style[BackgroundColor "white"; Padding "1em 1em 1em 1em"; TextAlign TextAlignOptions.Justify]]] [
+        Modal.content [Props[Style[BackgroundColor "white"; Padding "1em 1em 1em 1em"; TextAlign TextAlignOptions.Justify; Width "80%"]]] [
             Heading.h5 [] [str "ACADEMIC SOFTWARE LICENSE AGREEMENT FOR END-USERS AT PUBLICLY FUNDED ACADEMIC, EDUCATION OR RESEARCH INSTITUTIONS FOR THE USE OF targetp and iMLP."]
             p   [] [str """By accepting this License Agreement you are consenting to be bound by and become a party to this agreement as the "Licensee". If you do not agree to all of the terms of this agreement, you must not click the Acceptance button, nor use the product, and you do not become a LICENSEE under this agreement."""]
             br  []
@@ -185,7 +185,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     |TechnicalScientificDetails ->
         [
             br []
-            Heading.h4 [] [str "Scientific Details - our research about iMTS-L prediction:" ; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            Heading.h4 [] [str "Scientific Details - our research about iMTS-L prediction:" ; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
             ul [] [
                 li [] [str "Backes, S. et al. (2018) Tom70 enhances mitochondrial preprotein import efficiency by binding to internal targeting sequences. J. Cell Biol., 2018: 10.1083/jcb.201708044."]
                 li [] [str "Boos, F. et al. (2018) Detection of Internal Matrix Targeting Signal-like Sequences (iMTS-Ls) in Mitochondrial Precursor Proteins Using the TargetP Prediction Tool. BIO-PROTOCOL, 8, 2018: 10.21769/BioProtoc.2474."]
@@ -202,7 +202,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     |Contact        ->
         [
             br []
-            Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
             br []
             ul [] [
                 li [] [a[Props.Href "mailto:muehlhaus@bio.uni-kl.de"] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
@@ -212,7 +212,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     |HowToUse       ->
         [
             br []
-            Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
             br []
             ol [] [
                 li [] [
@@ -274,7 +274,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     |InputFormat    ->
         [
             br []
-            Heading.h4 [] [str "Input format help   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)]] [Fa.i [Fa.Solid.Times] []]]
+            Heading.h4 [] [str "Input format help   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
             br []
             str "The input for both single sequence or file mode has to be in fasta conform format. As this prediction algorithm predicts iMTS-L propensity of proteins, only protein sequences will produce valid output."
             br []
@@ -288,17 +288,17 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             ]
         ]
 
-let displayHelpSection (model:Model) (dispatch:Msg->unit) =
-    Section.section
-        [
-            yield Section.CustomClass "HelpSection";
-            if model.InformationSectionDisplay = NoHelp then
-                yield Section.Props [Style [Display DisplayOptions.None]]
-        ] [
-        Container.container [] [
-            Content.content [] (getDisplayHelpText model dispatch)
+let displayHelpModal (model:Model) (dispatch:Msg->unit) =
+    Modal.modal [Modal.IsActive (not (model.InformationSectionDisplay = NoHelp))] [
+        Modal.background [] []
+        Modal.content [Props[Style[Width "80%"; BackgroundColor "white"; Padding "1em 1em 1em 1em"; TextAlign TextAlignOptions.Justify]]] [
+            Container.container [] [
+                Content.content [] (getDisplayHelpText model dispatch)
+            ]
         ]
+        Modal.close [Modal.Close.OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch)] [str "close"]
     ]
+
 
 let downloadBtn (location:string) (model:Model) (dispatch: Msg -> unit)=
     Columns.columns[] [
@@ -493,27 +493,39 @@ let hero (model : Model) (dispatch : Msg -> unit) =
         ]
     ]
 
-let errorDisplay (model : Model) (dispatch : Msg -> unit) =
+let errorModal (showStackTrace:bool) (model : Model) (dispatch : Msg -> unit) =
     let msg,stackTrace =
         match model.ErrorState with
         | Some ex  -> match ex with
                       | :? Fable.Remoting.Client.ProxyRequestException as fe -> fe.Message, fe.ResponseText
                       | _ -> ex.Message,ex.StackTrace
         | None      -> "Unexpected Error","App failed without Exception message"
-    Section.section [Section.CustomClass "ErrorSection"] [
-        Heading.h2 [] [str "An error occured. Click the button below to reset the app state:"]
-        Button.button [Button.CustomClass "is-warning resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
-        br []
-        br []
-        Heading.h3 [] [str "If you are a developer and/or interested in the stack trace you can see the error message below."]
-        br []
-        Button.button [Button.Color IsInfo; Button.OnClick (fun _ -> ChangeErrorStateVisibility |> dispatch)] [str "toggle stack trace"]
-        br []
-        Content.content [Content.Props [Hidden (not model.ShowErrorStack)]] [
-            div [Class "block"] [ Heading.h5 [] [str msg]]
-            div [Class "block"] [ Heading.h5 [] [str "StackTrace:"]]
-            div [Class "block"] [
-                pre [] [str stackTrace ]
+
+    Modal.modal [Modal.IsActive model.HasError] [
+        Modal.background [] []
+        Modal.content [Props[Style[Width "80%"; BackgroundColor "salmon"; Padding "1em 1em 1em 1em"; TextAlign TextAlignOptions.Justify]]] [
+            Container.container [] [
+                Content.content [] [
+                    Heading.h2 [] [str "An error occured. Click the button below to reset the app state:"]
+                    div [Class "block"] [ Heading.h5 [] [str msg]]
+                    Button.button [Button.CustomClass "is-info resetBtn";Button.OnClick (fun _ -> Reset |> dispatch)] [str "RESET APP STATE"]
+                    br []
+                    br []
+                    Heading.h3 [] [str "If you are a developer and/or interested in the stack trace you can see the error message below."]
+                    br []
+                    Button.button [Button.Color IsInfo; Button.OnClick (fun _ -> ChangeErrorStateVisibility |> dispatch)] [str "toggle stack trace"]
+                    br []
+                    if showStackTrace then Content.content [Content.Props [Hidden (not model.ShowErrorStack)]] [
+                        div [Class "block"] [ Heading.h5 [] [str "StackTrace:"]]
+                        pre [Class "block is-white"] (
+                                stackTrace.Split([|" at "|],System.StringSplitOptions.None)
+                                |> Array.map (fun blck ->
+                                    p [Class "block"] [str blck]
+                                )
+                        )
+                    ]
+                ]
             ]
         ]
+        Modal.close [Modal.Close.OnClick (fun _ -> Reset |> dispatch)] [str "close"]
     ]

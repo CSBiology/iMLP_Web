@@ -35,6 +35,7 @@ type Model = {
     EULAModalVisible            :   bool
     BurgerVisible               :   bool
     SelectedComputationMode     :   ComputationMode
+    SelectedOrganismModel       :   OrganismModel
     SingleSequence              :   string
     SingleSequenceResultLegacy  :   LegacyResult Option
     SingleSequenceResultIMLP    :   IMLPResult Option
@@ -114,6 +115,7 @@ let initialModel = {
     EULAModalVisible            =   false
     BurgerVisible               =   false
     SelectedComputationMode     =   ComputationMode.IMLP
+    SelectedOrganismModel       =   NonPlant
     SingleSequence              =   ""
     SingleSequenceResultLegacy  =   None
     SingleSequenceResultIMLP    =   None
