@@ -21,6 +21,7 @@ open FileInputHelper.React
 open AppModel
 open StateHandling
 
+let block children = div [Class "block"] children 
 
 let navbar (model : Model) (dispatch : Msg -> unit) =
     let currentDisp = model.InformationSectionDisplay
@@ -184,90 +185,91 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
     |NoHelp         -> []
     |TechnicalScientificDetails ->
         [
-            br []
-            Heading.h4 [] [str "Scientific Details - our research about iMTS-L prediction:" ; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
-            ul [] [
-                li [] [str "Backes, S. et al. (2018) Tom70 enhances mitochondrial preprotein import efficiency by binding to internal targeting sequences. J. Cell Biol., 2018: 10.1083/jcb.201708044."]
-                li [] [str "Boos, F. et al. (2018) Detection of Internal Matrix Targeting Signal-like Sequences (iMTS-Ls) in Mitochondrial Precursor Proteins Using the TargetP Prediction Tool. BIO-PROTOCOL, 8, 2018: 10.21769/BioProtoc.2474."]
+            block [ Heading.h4 [] [str "Scientific Details - our research about iMTS-L prediction:" ; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]]
+            block [
+                ul [] [
+                    li [] [str "Backes, S. et al. (2018) Tom70 enhances mitochondrial preprotein import efficiency by binding to internal targeting sequences. J. Cell Biol., 2018: 10.1083/jcb.201708044."]
+                    li [] [str "Boos, F. et al. (2018) Detection of Internal Matrix Targeting Signal-like Sequences (iMTS-Ls) in Mitochondrial Precursor Proteins Using the TargetP Prediction Tool. BIO-PROTOCOL, 8, 2018: 10.21769/BioProtoc.2474."]
+                ]
             ]
-            br []
             Heading.h4 [] [str "Technical Details   "]
-            str "iMLP is based on the long short-term memory (LSTM) recurrent neural network architecture. These architectures are specially designed for feature detection in sequences and therefore well suited for the recognition of iMTS-Ls. The network is built and consumed using"
-            a [Href "https://docs.microsoft.com/en-us/cognitive-toolkit/"] [str " CNTK."]
-            br []
-            br []
-            str "Additionally to the LSTM network, we also provide the algorithm that produces the profiles the network was trained on. Coined 'Legacy model' in the UI, this approach uses TargetP to predict MTS probability of each sequence position and calculates the iMTS-L propensity score based on these values (for more info, check above papers.). This is naturally way slower than using the network to predic iMTS-Ls, but may be of interest if you are interested in the raw positional TargetP scores aswell."
-            br []
+            block [ str "iMLP is based on the long short-term memory (LSTM) recurrent neural network architecture. These architectures are specially designed for feature detection in sequences and therefore well suited for the recognition of iMTS-Ls. The network is built and consumed using"; a [Href "https://docs.microsoft.com/en-us/cognitive-toolkit/"] [str " CNTK."]]
+            block [ str "Additionally to the LSTM network, we also provide the algorithm that produces the profiles the network was trained on. Coined 'Legacy model' in the UI, this approach uses TargetP to predict MTS probability of each sequence position and calculates the iMTS-L propensity score based on these values (for more info, check above papers.). This is naturally way slower than using the network to predic iMTS-Ls, but may be of interest if you are interested in the raw positional TargetP scores aswell."]
         ]
     |Contact        ->
         [
-            br []
-            Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
-            br []
-            ul [] [
-                li [] [a[Props.Href "mailto:muehlhaus@bio.uni-kl.de"] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
-                li [] [a[Props.Href "mailto:schneike@rhrk.uni-kl.de"] [str "Kevin Schneider"] ; str ", Computational Systems Biology Kaiserslautern"]
+            block [ Heading.h4 [] [str "Contact   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]]
+            block [
+                ul [] [
+                    li [] [a[Props.Href "mailto:muehlhaus@bio.uni-kl.de"] [str "Timo Mühlhaus"] ; str ", Computational Systems Biology Kaiserslautern"]
+                    li [] [a[Props.Href "mailto:schneike@rhrk.uni-kl.de"] [str "Kevin Schneider"] ; str ", Computational Systems Biology Kaiserslautern"]
+                ]
             ]
         ]
     |HowToUse       ->
         [
-            br []
-            Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]
-            br []
-            ol [] [
-                li [] [
-                    Heading.h6 [Heading.IsSubtitle] [
-                        str "General"
+            block [ Heading.h4 [] [str "How To Use   "; Icon.icon [Icon.Props [OnClick (fun _ -> ChangeHelpDisplay NoHelp |> dispatch); Style [Color "red"; Float FloatOptions.Right; Cursor (box "pointer")]]] [Fa.i [Fa.Solid.Times] []]]]
+            ul [] [
+                li [Class "block"] [
+                    block [Heading.h6 [Heading.IsSubtitle] [str "General"]]
+                    block [str "The general workflow supported by this website contains these steps:"]
+                    block [
+                        ol [] [
+                            li [Class "block"] [str "Provide input peptide sequences either as text or as fasta file"]
+                            li [Class "block"] [str "Select the model closest to your organism of interest (plant or non-plant). Please note that the plant model is highly experimental."]
+                            li [Class "block"] [str "[Optional] In most cases, you are done. If you are interested in raw TargetP scores, you can additionally choose to use the legacy computation mode. Note that you have to agree to the eula associated to our usage of TargetP to do so. For more info about this mode please head "; a [OnClick (fun _ -> () )] [str "here"]]
+                            li [Class "block"] [str "Run the computation"] 
+                        ]
                     ]
-                    str ""
                 ]
-                li [] [
-                    Heading.h6 [Heading.IsSubtitle] [
-                        str "Input"
+                block [
+                    li [Class "block"] [
+                        block [ Heading.h6 [Heading.IsSubtitle] [str "Input"]]
+                        block [ a [OnClick (fun _ -> ChangeHelpDisplay (InputFormat) |> dispatch)] [str "Learn more about the input format here"]]
+                        block [
+                            strong [] [str "for batch computations with more than 1000 sequences, please "]
+                            a [OnClick (fun _ -> ChangeHelpDisplay (Contact) |> dispatch)] [str "contact us"]
+                            strong [] [str " or use the "]
+                            a [Href ""] [str "standalone tool"]
+                        ]
+                        block [ str "Provide input either via entering a single protein sequence in the textbox or by oploading a file pressing the file link below the textbox."]
+                        block [ str "When provided a single sequence via the textbox, a single iMTS-L prediction report will pop in the Result section once the prediction is finished."]
+                        block [ str "When provided a file with multiple sequences, iMTS-L prediction results will be generated one after another. You can view the results in the Result section as they are generated, meaning the amount of tabs in the Result section will increase over time while the predictions are finished. You can observe the progress on a per-sequence basis via the progress bar."]
                     ]
-                    a [OnClick (fun _ -> ChangeHelpDisplay (InputFormat) |> dispatch)] [str "Learn more about the input format here"]
-                    br []
-                    br []
-                    str "Provide input either via entering a single protein sequence in the textbox or by oploading a file pressing the file link below the textbox."
-                    br []
-                    br []
-                    str "When provided a single sequence via the textbox, a single iMTS-L prediction report will pop in the Result section once the prediction is finished."
-                    br []
-                    br []
-                    str "When provided a file with multiple sequences, iMTS-L prediction results will be generated one after another. You can view the results in the Result section as they are generated, meaning the amount of tabs in the Result section will increase over time while the predictions are finished. You can observe the progress on a per-sequence basis via the progress bar."
-                    br []
-                    br[]
-
                 ]
-                li [] [
-                    Heading.h6 [Heading.IsSubtitle] [
-                        str "Output - Plots"
+                block [
+                    li [Class "block"] [
+                        Heading.h6 [Heading.IsSubtitle] [
+                            str "Output - Plots"
+                        ]
+                        str "The generated plots are fully interactive, meaning you can zoom, pinch, etc."
+                        br []
+                        br []
+                        str "If you like the plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "
+                        br[]
+                        br[]
                     ]
-                    str "The generated plots are fully interactive, meaning you can zoom, pinch, etc."
-                    br []
-                    br []
-                    str "If you like the plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "
-                    br[]
-                    br[]
                 ]
-                li [] [
-                    Heading.h6 [Heading.IsSubtitle] [
-                        str "Output - Download tab separated results"
+                block [
+                    li [Class "block"] [
+                        Heading.h6 [Heading.IsSubtitle] [
+                            str "Output - Download tab separated results"
+                        ]
+                        str "A download link for your results in tab separated form can be generated using the button on the bottom of the results section."
+                        br []
+                        str "Format:"
+                        pre [] [
+                            str
+                                "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
+                        ]
+                        br []
+                        str "if the legacy model based on raw TargetP scores was used, the output has an additional column named \"Raw_TargetP_Scores\"."
+                        br []
+                        br []
+                        str "Once you generated the link, press on the download button to start the download."
+                        br[]
+                        br[]
                     ]
-                    str "A download link for your results in tab separated form can be generated using the button on the bottom of the results section."
-                    br []
-                    str "Format:"
-                    pre [] [
-                        str
-                            "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
-                    ]
-                    br []
-                    str "if the legacy model based on raw TargetP scores was used, the output has an additional column named \"Raw_TargetP_Scores\"."
-                    br []
-                    br []
-                    str "Once you generated the link, press on the download button to start the download."
-                    br[]
-                    br[]
                 ]
             ]
         ]
