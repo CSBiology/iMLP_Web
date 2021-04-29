@@ -3,7 +3,7 @@ group Server
     framework: netcoreapp2.2
     storage: none
 
-    nuget CNTK.CPUOnly 2.8.0-rc0.dev20200201 rc0
+    nuget CNTK.CPUOnly 2.7.0
     nuget FSharp.Core
     nuget Suave 2.5.5
     nuget Fable.Remoting.Suave ~> 3
