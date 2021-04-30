@@ -76,6 +76,8 @@ type Model = {
         |File -> 
             match model.FastaFileInput with
             |[||] -> false,"No data provided"
+            | x when x.Length > 1000 ->
+                false, "Too many sequences (>1000)."
             | _ ->
                 match model.HasValidFasta with
                 | false -> false, "Fasta is invalid"

@@ -349,11 +349,11 @@ let modeSelection (model : Model) (dispatch : Msg -> unit) =
         Textarea.textarea [
             Textarea.Size Size.IsMedium
             
-            Textarea.Placeholder "insert a single amino acid sequence in FASTA format (with header)"
-            Textarea.OnChange (fun e -> let sequence = !!e.target?value
-                                        SingleSequenceInput sequence |> dispatch)
-
-                ] []
+            Textarea.Placeholder "insert a single amino acid sequence in FASTA format (with or without header)"
+            Textarea.OnChange (fun e ->
+                let sequence = !!e.target?value
+                SingleSequenceInput sequence |> dispatch)
+            ] []
     | _ ->
         File.file [File.IsBoxed;File.IsFullWidth;File.HasName] [
             File.label [] [
