@@ -77,6 +77,10 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
         let updatedModel = {currentModel with SeqMode = sm}
         updatedModel,Cmd.none
 
+    | OrganismModelSelection m ->
+        let updatedModel = {currentModel with SelectedOrganismModel = m}
+        updatedModel,Cmd.none
+
     | ToggleBurger -> 
         let updatedModel = {currentModel with BurgerVisible = not currentModel.BurgerVisible}
         updatedModel,Cmd.none

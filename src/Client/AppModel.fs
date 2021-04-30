@@ -149,6 +149,7 @@ type Msg =
 | EULAAcceptedChange
 | ShowEulaModal                     of bool
 | SeqModeSelection                  of Mode
+| OrganismModelSelection            of OrganismModel
 | FastaUploadInput                  of string*string
 | SingleSequenceInput               of string
 // Upload a single sequence and execute serverside computation based on computation mode

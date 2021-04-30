@@ -217,7 +217,6 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                         ol [] [
                             li [Class "block"] [str "Provide input peptide sequences either as text or as fasta file"]
                             li [Class "block"] [str "Select the model closest to your organism of interest (plant or non-plant). Please note that the plant model is highly experimental."]
-                            li [Class "block"] [str "[Optional] In most cases, you are done. If you are interested in raw TargetP scores, you can additionally choose to use the legacy computation mode. Note that you have to agree to the eula associated to our usage of TargetP to do so. For more info about this mode please head "; a [OnClick (fun _ -> () )] [str "here"]]
                             li [Class "block"] [str "Run the computation"] 
                         ]
                     ]
@@ -263,7 +262,6 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                                 "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
                         ]
                         br []
-                        str "if the legacy model based on raw TargetP scores was used, the output has an additional column named \"Raw_TargetP_Scores\"."
                         br []
                         br []
                         str "Once you generated the link, press on the download button to start the download."
@@ -442,19 +440,36 @@ let inputSelection (model : Model) (dispatch : Msg -> unit) =
                                 | _ -> ())
                         ] [str buttonMsg ]
                         br []
-                        Control.div [Control.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
-                            Checkbox.checkbox [Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
-                                Checkbox.input [Props[OnClick (fun _ -> EULAAcceptedChange |> dispatch)]]
-                                b [] [ str" Use legacy computation model"]
+                        Label.label [Label.Size IsMedium; Label.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [str "select iMLP Model:"]
+                        Field.div [Field.IsGrouped] [
+                            let isNonPlant = model.SelectedOrganismModel = OrganismModel.NonPlant
+                            Control.div [Control.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+
+                                Checkbox.checkbox [Props [Style[CSSProp.Color "rgb(237, 125, 49)"] ]] [
+                                    Checkbox.input [Props [OnClick (fun _ -> OrganismModelSelection OrganismModel.NonPlant |> dispatch); Checked isNonPlant]]
+                                    b [] [ str "NonPlant"]
+                                ]
                             ]
-                            div [Class "block"] [
-                                str "in order to use the targetP-based legacy model you have to agree to iMLP's "
-                                a [ OnClick (fun _ -> ShowEulaModal true |> dispatch)
-                                    Style [Color "white";]] [
-                                    str "end user license agreement (EULA)"
-                            ]
+                            Control.div [Control.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+                                Checkbox.checkbox [Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+                                    Checkbox.input [Props[OnClick (fun _ -> OrganismModelSelection OrganismModel.Plant |> dispatch); Checked (not isNonPlant)]]
+                                    b [] [ str "Plant"]
+                                ]
                             ]
                         ]
+                        //Control.div [Control.Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+                        //    Checkbox.checkbox [Props [Style[CSSProp.Color "rgb(237, 125, 49)"]]] [
+                        //        Checkbox.input [Props[OnClick (fun _ -> EULAAcceptedChange |> dispatch)]]
+                        //        b [] [ str" Use legacy computation model"]
+                        //    ]
+                        //    div [Class "block"] [
+                        //        str "in order to use the targetP-based legacy model you have to agree to iMLP's "
+                        //        a [ OnClick (fun _ -> ShowEulaModal true |> dispatch)
+                        //            Style [Color "white";]] [
+                        //            str "end user license agreement (EULA)"
+                        //    ]
+                        //    ]
+                        //]
                     ]
                     Column.column [Column.Width (Screen.Desktop, Column.Is4)] []
                 ]
