@@ -194,7 +194,6 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             ]
             Heading.h4 [] [str "Technical Details   "]
             block [ str "iMLP is based on the long short-term memory (LSTM) recurrent neural network architecture. These architectures are specially designed for feature detection in sequences and therefore well suited for the recognition of iMTS-Ls. The network is built and consumed using"; a [Href "https://docs.microsoft.com/en-us/cognitive-toolkit/"] [str " CNTK."]]
-            block [ str "Additionally to the LSTM network, we also provide the algorithm that produces the profiles the network was trained on. Coined 'Legacy model' in the UI, this approach uses TargetP to predict MTS probability of each sequence position and calculates the iMTS-L propensity score based on these values (for more info, check above papers.). This is naturally way slower than using the network to predic iMTS-Ls, but may be of interest if you are interested in the raw positional TargetP scores aswell."]
         ]
     |Contact        ->
         [
@@ -217,7 +216,8 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                         ol [] [
                             li [Class "block"] [str "Provide input peptide sequences either as text or as fasta file"]
                             li [Class "block"] [str "Select the model closest to your organism of interest (plant or non-plant). Please note that the plant model is highly experimental."]
-                            li [Class "block"] [str "Run the computation"] 
+                            li [Class "block"] [str "Run the iMTS-L propensity profile prediction"] 
+                            li [Class "block"] [str "Results are provided on the webpage and can be downloaded"] 
                         ]
                     ]
                 ]
@@ -241,32 +241,28 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                         Heading.h6 [Heading.IsSubtitle] [
                             str "Output - Plots"
                         ]
-                        str "The generated plots are fully interactive, meaning you can zoom, pinch, etc."
-                        br []
-                        br []
-                        str "If you like the plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "
-                        br[]
-                        br[]
+                        block [str "Output of the webpage is twofold: "]
+                        block [
+                            ol [] [
+                                li [Class "block"] [
+                                    block [ str "static iMTS-L propensity score heatmap over the protein sequence"]
+                                ]
+                                li [Class "block"] [
+                                    block [str "Interactive iMTS-L propensity score profile area plot"]
+                                    block [str "These generated plots are fully interactive, meaning you can zoom, pinch, etc."]
+                                    block [str "If you like these plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "]
+                                ]
+                            ]
+                        ]
                     ]
                 ]
                 block [
                     li [Class "block"] [
-                        Heading.h6 [Heading.IsSubtitle] [
-                            str "Output - Download tab separated results"
-                        ]
-                        str "A download link for your results in tab separated form can be generated using the button on the bottom of the results section."
-                        br []
-                        str "Format:"
-                        pre [] [
-                            str
-                                "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""
-                        ]
-                        br []
-                        br []
-                        br []
-                        str "Once you generated the link, press on the download button to start the download."
-                        br[]
-                        br[]
+                        block [Heading.h6 [Heading.IsSubtitle] [str "Output - Download tab separated results"]]
+                        block [str "A download link for your results in tab separated form can be generated using the button on the bottom of the results section."]
+                        block [str "Format:"]
+                        block [pre [] [str "\"Header\"\t\"Sequence\"\t\"iMTS-L_Propensity_Scores\"\"\n\"FirstHeader\"\t\"A  ...  K\"\t\"0.425000; ... ; 0.056000\"\n...     \t...     \t...     \n\"LastHeader\"\t\"M  ...  F\"\t\"1.905452; ... ; -2.100000\""]]
+                        block [str "Once you generated the link, press on the download button to start the download."]
                     ]
                 ]
             ]

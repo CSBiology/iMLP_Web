@@ -317,7 +317,7 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
 
 
 let targetPApi = {
-    SingleSequenceRequestLegacy = fun single -> async {
+    SingleSequenceRequestLegacy = fun (model,single) -> async {
         //read fasta item from input
         let fastA =
             if single.StartsWith(">") then
@@ -332,13 +332,10 @@ let targetPApi = {
                 |> String.split '\n'
                 |> FastA.fromFileEnumerator id
                 |> Array.ofSeq
+
         let header = fastA.[0].Header
 
         let targetModel = TargetP.NonPlant
-
-            
-            //compute propensity based on computation mode
-            //set up parameters and Biocontainer + context
 
         let client = Docker.connect "npipe://./pipe/docker_engine"
         let tpContext = 
@@ -404,7 +401,7 @@ let targetPApi = {
     }
 
     SingleSequenceRequestIMLP =
-        fun single -> async {
+        fun (model,single) -> async {
             //read fasta item from input
             let fastA =
                 if single.StartsWith(">") then
@@ -428,10 +425,10 @@ let targetPApi = {
                 |> fun x -> x.Sequence
                 |> Array.ofSeq
                 |> String.fromCharArray
-
+                 
             let imlpPropensity =
                 fastaString
-                |> CNTKServer.predictFinal
+                |> CNTKServer.Prediction.predictIMTSLPropensityForSequence (CNTKServer.Models.getModelBuffer model)
 
             return {
                 Header              =   header

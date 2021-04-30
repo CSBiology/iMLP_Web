@@ -8,7 +8,6 @@ module Route =
         sprintf "/api/%s/%s" typeName methodName
 
 type OrganismModel =
-|NoModel
 |Plant
 |NonPlant
 
@@ -40,12 +39,12 @@ type IMLPResult = {
 type ITargetPApi = {
 
     // Legacy model
-    SingleSequenceRequestLegacy : string -> Async<LegacyResult>
+    SingleSequenceRequestLegacy : OrganismModel*string -> Async<LegacyResult>
     DownloadRequestSingleLegacy: LegacyResult*System.Guid -> Async<unit>
     DownloadRequestMultipleLegacy: LegacyResult array * System.Guid -> Async<unit>
 
     //iMLP model
-    SingleSequenceRequestIMLP : string -> Async<IMLPResult>
+    SingleSequenceRequestIMLP : OrganismModel*string -> Async<IMLPResult>
     DownloadRequestSingleIMLP: IMLPResult*System.Guid -> Async<unit>
     DownloadRequestMultipleIMLP: IMLPResult array * System.Guid -> Async<unit>
 }

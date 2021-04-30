@@ -148,7 +148,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             let requestCmd = 
                 Cmd.OfAsync.either
                     Server.targetPApi.SingleSequenceRequestLegacy
-                    currentModel.SingleSequence
+                    (currentModel.SelectedOrganismModel, currentModel.SingleSequence)
                     (Ok >> SingleSequenceResponseLegacy)
                     (Error >> SingleSequenceResponseLegacy)
             updatedModel,requestCmd
@@ -163,7 +163,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
             let requestCmd = 
                 Cmd.OfAsync.either
                     Server.targetPApi.SingleSequenceRequestIMLP
-                    currentModel.SingleSequence
+                    (currentModel.SelectedOrganismModel, currentModel.SingleSequence)
                     (Ok >> SingleSequenceResponseIMLP)
                     (Error >> SingleSequenceResponseIMLP)
             updatedModel,requestCmd
@@ -184,7 +184,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 if processIndex < fileLength then
                     Cmd.OfAsync.either
                         Server.targetPApi.SingleSequenceRequestLegacy
-                        currentModel.FastaFileInput.[processIndex]
+                        (currentModel.SelectedOrganismModel, currentModel.FastaFileInput.[processIndex])
                         (Ok >> FastaUploadResponseLegacy )
                         (Error >> FastaUploadResponseLegacy )
                 else
@@ -205,7 +205,7 @@ let update (msg : Msg) (currentModel : Model) : Model * Cmd<Msg> =
                 if processIndex < fileLength then
                     Cmd.OfAsync.either
                         Server.targetPApi.SingleSequenceRequestIMLP
-                        currentModel.FastaFileInput.[processIndex]
+                        (currentModel.SelectedOrganismModel, currentModel.FastaFileInput.[processIndex])
                         (Ok >> FastaUploadResponseIMLP )
                         (Error >> FastaUploadResponseIMLP )
                 else
