@@ -10,6 +10,7 @@
         <EmbeddedResource Include="models\CNTK\non_plant\IMTS_nonPlant_HumanMouseYeast.model" />
         <EmbeddedResource Include="models\CNTK\plant\IMTS_Plant_AraMaizeRice.model" />
         <Compile Include="..\Shared\Shared.fs" />
+        <Compile Include="InputSanitizing.fs" />
         <Compile Include="CNTK.fs" />
         <Compile Include="TargetP.fs" />
         <Compile Include="Server.fs" />

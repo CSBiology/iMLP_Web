@@ -21,10 +21,6 @@ open StateHandling
 open GenericViewComponents
 open ResultViews
 
-
-
-
-
 //let progressDetails (show:bool) (model : Model)  (dispatch: Msg -> unit)  =
 //    div [] [
 //        if model.HasJobRunning then 

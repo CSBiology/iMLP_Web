@@ -15,23 +15,55 @@ type ComputationMode =
 | Legacy
 | IMLP
 
+type ParseState =
+    | EmptySequence
+    | FilteredEmptySequence
+    | InvalidCharacters of char []
+    | ShortSequence of string
+    | FilteredShortSequence of string
+    | ContainsGapTerOJ of string
+    | Success of string
+    | InternalServerError
 
-type LegacyResult = {
-    Header                  : string
-    Sequence                : string
-    RawTargetPScores        : float array
-    SmoothedTargetPScores   : float array
-    PropensityScores        : float array
-    PropensityPlotHtml      : string
-    ScorePlotHtml           : string
-}
+type LegacyResult =
+    {
+        Header                  : string
+        Sequence                : string
+        RawTargetPScores        : float array
+        SmoothedTargetPScores   : float array
+        PropensityScores        : float array
+        PropensityPlotHtml      : string
+        ScorePlotHtml           : string
+        ParseState              : ParseState
+    } with
+        static member create header sequence raw smoothed prop propPlot scorePlot parseState =
+            {
+                Header                  = header
+                Sequence                = sequence
+                RawTargetPScores        = raw
+                SmoothedTargetPScores   = smoothed
+                PropensityScores        = prop
+                PropensityPlotHtml      = propPlot
+                ScorePlotHtml           = scorePlot
+                ParseState              = parseState
+            }
 
-type IMLPResult = {
-    Header              : string
-    Sequence            : string
-    PropensityScores    : float array
-    PropensityPlotHtml  : string
-}
+type IMLPResult =
+    {
+        Header              : string
+        Sequence            : string
+        PropensityScores    : float array
+        PropensityPlotHtml  : string
+        ParseState          : ParseState
+    } with
+        static member create header sequence prop propPlot parseState=
+            {
+                Header              = header
+                Sequence            = sequence
+                PropensityScores    = prop
+                PropensityPlotHtml  = propPlot
+                ParseState          = parseState
+            }
 
 /// A type that specifies the communication protocol between client and server
 /// to learn more, read the docs at https://zaid-ajaj.github.io/Fable.Remoting/src/basics.html

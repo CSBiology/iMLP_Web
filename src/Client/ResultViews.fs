@@ -41,7 +41,6 @@ module ViewComponents =
             [0 .. resultLenght-1]
         let numbers =
             let x = indices.[(max 1 (pos-2)) .. (min (pos+2) (resultLenght-2)) ]
-            printfn "%A" x
             x
             |> List.map (fun index -> pageinateFromIndex index model dispatch) 
         numbers
@@ -190,8 +189,9 @@ module ViewComponents =
             scores'
             |> Array.map (fun s -> s/maxVal)
             |> fun x ->
-                console.log(sprintf "score length: %i" x.Length)
-                console.log(sprintf "sequence length: %i" sequence.Length)
+                //console.log(sprintf "score length: %i" x.Length)
+                //console.log(sprintf "sequence length: %i" sequence.Length)
+                //console.log(sequence)
                 x |> Array.map2 (fun char score -> int ((score) * 100.) ,char) sequence
         let spans =
             norm 
@@ -240,51 +240,105 @@ module ViewComponents =
 
 module CompositeViews =
 
+    let parseStateMessage (p:ParseState) =
+        
+        let importance = 
+            match p with
+            | Success _ ->
+                Notification.Color Color.IsSuccess
+            | ContainsGapTerOJ _ | FilteredShortSequence _ | ShortSequence _ ->
+                Notification.Color Color.IsWarning
+            | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
+                Notification.Color Color.IsDanger
+
+        Notification.notification [importance] [
+            match p with
+            | Success _ -> str "Success"
+            | ContainsGapTerOJ sanitized ->
+                block [h3 [Class "title"] [str "Warning" ]]
+                block [str "Input sequence contained Gap,Terminator,Pyrrolysine, and/or J(Xle -Leucine or Isoleucine) characters ('*'/'-'/O/J) and was filtered for them"]
+                block [str "Sanitized input:"]
+                block [str sanitized]
+            | ShortSequence sanitized ->
+                block [h3 [Class "title"] [str "Warning" ]]
+                block [str "Input sequence was short (<=21 amino acids). Sequences of this length may likely not contain iMTS-Ls."]
+            | FilteredShortSequence sanitized ->
+                block [h3 [Class "title"] [str "Warning" ]]
+                block [str "Input sequence contained Gap,Terminator,Pyrrolysine, and/or J(Xle -Leucine or Isoleucine) characters ('*'/'-'/O/J) and was filtered for them"]
+                block [str "Sanitized input:"]
+                block [str sanitized]
+                block [str "Additionally this input sequence was short (<=21 amino acids). Sequences of this length may likely not contain iMTS-Ls."]
+            | InvalidCharacters inv ->
+                block [h3 [Class "title"] [str "Error" ]]
+                block [str "Input sequence contained invalid characters"]
+                block [str "Invalid Characters:"]
+                block [str (inv |> Array.distinct |> Array.fold (fun acc elem -> sprintf "%s, %c" acc elem) "")]
+            | FilteredEmptySequence ->
+                block [h3 [Class "title"] [str "Error" ]]
+                block [str "Input sequence was empty after filtering illegal characters and/or Gap,Terminator,Pyrrolysine, and/or J(Xle -Leucine or Isoleucine)  ('*'/'-'/O/J)"]
+            | EmptySequence ->
+                block [h3 [Class "title"] [str "Error" ]]
+                block [str "Input sequence was empty"]
+            | InternalServerError ->
+                block [h3 [Class "title"] [str "Error" ]]
+                block [str "Internal server error during prediction of this protein. Please contact us if this error persists."]
+
+        ]
+
     module Legacy = 
 
         let singleResult (model : Model) (dispatch: Msg -> unit) (res: LegacyResult) =
             Columns.columns [Columns.IsCentered] [
                 Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
                 Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
-                    br []
-                    Heading.h4 [] [str res.Header]
-                    ViewComponents.plotModeSwitch model dispatch
-                    hr []
-                    Heading.h4 [] [
-                        if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
-                            yield str "iMTS-L propensity heatmap:"
-                        else
-                            yield str "Raw TargetP sequence score heatmap:"
-                    ]
-                    ViewComponents.fastaFormatDisplay
-                        model
-                        (res.Sequence.ToCharArray())
-                        (
-                            if model.PlotMode = Propensity then
-                                res.PropensityScores
+                    match res.ParseState with
+                    | Success sanitized | ContainsGapTerOJ sanitized | FilteredShortSequence sanitized | ShortSequence sanitized ->
+                        br []
+                        Heading.h4 [] [str res.Header]
+                        ViewComponents.plotModeSwitch model dispatch
+                        hr []
+                        parseStateMessage res.ParseState
+                        Heading.h4 [] [
+                            if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
+                                yield str "iMTS-L propensity heatmap:"
                             else
-                                res.RawTargetPScores
-                        )
-                    hr []
-                    Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
-                    iframe [
-                        Props.SrcDoc
+                                yield str "Raw TargetP sequence score heatmap:"
+                        ]
+                        ViewComponents.fastaFormatDisplay
+                            model
+                            (sanitized.ToCharArray())
                             (
-                                if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
-                                    res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                                if model.PlotMode = Propensity then
+                                    res.PropensityScores
                                 else
-                                    res.ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                                    res.RawTargetPScores
                             )
-                        Props.Class "ResultFrame"
-                        Props.Scrolling "no"]
-                        [
-                            p [] [
-                                str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                            ]
-                    ]
-                    Heading.h4 [] [str "Download your results"]
-                    hr[]
-                    downloadView model dispatch
+                        hr []
+                        Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
+                        iframe [
+                            Props.SrcDoc
+                                (
+                                    if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
+                                        res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                                    else
+                                        res.ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                                )
+                            Props.Class "ResultFrame"
+                            Props.Scrolling "no"]
+                            [
+                                p [] [
+                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                                ]
+                        ]
+                        Heading.h4 [] [str "Download your results"]
+                        hr[]
+                        downloadView model dispatch
+                    | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
+                        br []
+                        Heading.h4 [] [str res.Header]
+                        ViewComponents.plotModeSwitch model dispatch
+                        hr []
+                        parseStateMessage res.ParseState
                 ]
                 Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
             ]
@@ -305,35 +359,47 @@ module CompositeViews =
                         div [Class "has-text-centered"] [str "<"]
                     ]
                 Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
-                    br []
-                    Heading.h4 [] [str res.[index].Header]
-                    ViewComponents.plotModeSwitch model dispatch
-                    hr []
-                    Heading.h4 [] [str "Sequence score heatmap:"]
-                    ViewComponents.fastaFormatDisplay
-                        model
-                        (res.[index].Sequence.ToCharArray())
-                        (if model.PlotMode = Propensity then res.[index].PropensityScores else res.[index].RawTargetPScores)
-                    hr []
-                    Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
-                    iframe [
-                        Props.SrcDoc
-                            (
-                                if model.PlotMode = Propensity then
-                                    res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
-                                else
-                                    res.[index].ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") 
-                            )
-                        Props.Class "ResultFrame"
-                        Props.Scrolling "no"]
-                        [
-                            p [] [
-                                str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                            ]
-                    ]
-                    Heading.h4 [] [str "Download your results"]
-                    hr[]
-                    downloadView model dispatch
+
+                    let currentRes = res.[index]
+
+                    match currentRes.ParseState with
+                    | Success _ | ContainsGapTerOJ _ | FilteredShortSequence _ | ShortSequence _ ->
+                        parseStateMessage currentRes.ParseState
+                        br []
+                        Heading.h4 [] [str res.[index].Header]
+                        ViewComponents.plotModeSwitch model dispatch
+                        hr []
+                        Heading.h4 [] [str "Sequence score heatmap:"]
+                        ViewComponents.fastaFormatDisplay
+                            model
+                            (currentRes.Sequence.ToCharArray())
+                            (if model.PlotMode = Propensity then currentRes.PropensityScores else currentRes.RawTargetPScores)
+                        hr []
+                        Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
+                        iframe [
+                            Props.SrcDoc
+                                (
+                                    if model.PlotMode = Propensity then
+                                        currentRes.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>")
+                                    else
+                                        currentRes.ScorePlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") 
+                                )
+                            Props.Class "ResultFrame"
+                            Props.Scrolling "no"]
+                            [
+                                p [] [
+                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                                ]
+                        ]
+                        Heading.h4 [] [str "Download your results"]
+                        hr[]
+                        downloadView model dispatch
+                    | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
+                        br []
+                        Heading.h4 [] [str currentRes.Header]
+                        ViewComponents.plotModeSwitch model dispatch
+                        hr []
+                        parseStateMessage currentRes.ParseState
                 ]
                 Column.column
                     [
@@ -351,33 +417,44 @@ module CompositeViews =
             Columns.columns [Columns.IsCentered] [
                 Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
                 Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
-                    br []
-                    Heading.h4 [] [str res.Header]
-                    hr []
-                    Heading.h4 [] [
-                        if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
-                            yield str "iMTS-L propensity heatmap:"
-                        else
-                            yield str "Raw TargetP sequence score heatmap:"
-                    ]
-                    ViewComponents.fastaFormatDisplay
-                        model
-                        (res.Sequence.ToCharArray())
-                        res.PropensityScores
-                    hr []
-                    Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
-                    iframe [
-                        Props.SrcDoc (res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
-                        Props.Class "ResultFrame"
-                        Props.Scrolling "no"]
-                        [
-                            p [] [
-                                str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                            ]
-                    ]
-                    Heading.h4 [] [str "Download your results"]
-                    hr[]
-                    downloadView model dispatch
+                    match res.ParseState with
+                    | Success sanitized | ContainsGapTerOJ sanitized | FilteredShortSequence sanitized | ShortSequence sanitized ->
+                        br []
+                        Heading.h4 [] [str res.Header]
+                        hr []
+                        Heading.h4 [] [
+                            if model.PlotMode = Propensity || model.SelectedComputationMode = ComputationMode.IMLP then
+                                yield str "iMTS-L propensity heatmap:"
+                            else
+                                yield str "Raw TargetP sequence score heatmap:"
+                        ]
+                        ViewComponents.fastaFormatDisplay
+                            model
+                            (sanitized.ToCharArray())
+                            res.PropensityScores
+                        hr []
+                        Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
+                        iframe [
+                            Props.SrcDoc (res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
+                            Props.Class "ResultFrame"
+                            Props.Scrolling "no"]
+                            [
+                                p [] [
+                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                                ]
+                        ]
+                        hr[]
+                        Heading.h4 [] [str "RunInfo"]
+                        parseStateMessage res.ParseState
+                        Heading.h4 [] [str "Download your results"]
+                        hr[]
+                        downloadView model dispatch
+                    | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
+                        br []
+                        Heading.h4 [] [str res.Header]
+                        hr []
+                        Heading.h4 [] [str "RunInfo"]
+                        parseStateMessage res.ParseState
                 ]
                 Column.column [Column.Width (Screen.Desktop, Column.Is2)] []
             ]
@@ -397,28 +474,41 @@ module CompositeViews =
                         div [Class "has-text-centered"] [str "<"]
                     ]
                 Column.column [Column.CustomClass "transparent fastaDisplay";Column.Width (Screen.Desktop, Column.Is8)] [
-                    br []
-                    Heading.h4 [] [str res.[index].Header]
-                    hr []
-                    Heading.h4 [] [str "Sequence score heatmap:"]
-                    ViewComponents.fastaFormatDisplay
-                        model
-                        (res.[index].Sequence.ToCharArray())
-                        res.[index].PropensityScores
-                    hr []
-                    Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
-                    iframe [
-                        Props.SrcDoc (res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") )
-                        Props.Class "ResultFrame"
-                        Props.Scrolling "no"]
-                        [
-                            p [] [
-                                str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                            ]
-                    ]
-                    Heading.h4 [] [str "Download your results"]
-                    hr[]
-                    downloadView model dispatch
+                    let currentRes = res.[index]
+                    
+                    match currentRes.ParseState with
+                    | Success _ | ContainsGapTerOJ _ | FilteredShortSequence _ | ShortSequence _ ->
+                        br []
+                        Heading.h4 [] [str res.[index].Header]
+                        hr []
+                        Heading.h4 [] [str "Sequence score heatmap:"]
+                        ViewComponents.fastaFormatDisplay
+                            model
+                            (res.[index].Sequence.ToCharArray())
+                            res.[index].PropensityScores
+                        hr []
+                        Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
+                        iframe [
+                            Props.SrcDoc (res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") )
+                            Props.Class "ResultFrame"
+                            Props.Scrolling "no"]
+                            [
+                                p [] [
+                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                                ]
+                        ]
+                        hr[]
+                        Heading.h4 [] [str "RunInfo"]
+                        parseStateMessage currentRes.ParseState
+                        Heading.h4 [] [str "Download your results"]
+                        hr[]
+                        downloadView model dispatch
+                    | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
+                        br []
+                        Heading.h4 [] [str currentRes.Header]
+                        hr []
+                        Heading.h4 [] [str "RunInfo"]
+                        parseStateMessage currentRes.ParseState
                 ]
                 Column.column
                     [

@@ -277,13 +277,12 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
             str "Fasta conform means:"
             ul [] [
                 li [] [str "each protein sequence is headed by a single line identifying header, started by the '>' character. In the case of a single sequence input the header can be omitted."]
-                li [] [str "The sequence starts in the next line and only consist of valid amino acid characters (ACDEFGHIKLMNOPQRSTUVWY)"]
-                li [] [str "Ambiguity characters (XJZB) are okay"]
-                li [] [str "Gap and terminator characters (- and *) are filtered out by us. Just keep this in mind when you look at your profiles."]
+                li [] [str "The sequence starts in the next line and only consist of valid amino acid characters (ACDEFGHIKLMNPQRSTUVWY)"]
+                li [] [str "Ambiguity characters (XZB) are okay"]
+                li [] [str "Gap and terminator characters (- and *), as well as O(Pyrrolysine) and J(XLE - XleLeucine or Isoleucine) are filtered out by us. Just keep this in mind when you look at your profiles."]
                 li [] [str "All other characters not mentioned above can lead to invalid output."]
             ]
         ]
-
 let displayHelpModal (model:Model) (dispatch:Msg->unit) =
     Modal.modal [Modal.IsActive (not (model.InformationSectionDisplay = NoHelp))] [
         Modal.background [] []

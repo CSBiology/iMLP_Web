@@ -55,34 +55,33 @@ module Prediction =
     
     let aminoAcidSetStandard =
         [
-            AminoAcid.Ala
-            AminoAcid.Cys
-            AminoAcid.Asp
-            AminoAcid.Glu
-            AminoAcid.Phe
-            AminoAcid.Gly
-            AminoAcid.His
-            AminoAcid.Ile
-            AminoAcid.Lys
-            AminoAcid.Leu
-            AminoAcid.Met
-            AminoAcid.Asn
+            AminoAcid.Ala // A
+            AminoAcid.Cys // C
+            AminoAcid.Asp // D
+            AminoAcid.Glu // E
+            AminoAcid.Phe // F
+            AminoAcid.Gly // G
+            AminoAcid.His // H
+            AminoAcid.Ile // I
+            AminoAcid.Lys // K
+            //J Xle Leucine or Isoleucine
+            AminoAcid.Leu // L
+            AminoAcid.Met // M
+            AminoAcid.Asn // N
             //AminoAcid.Pyl
-            AminoAcid.Pro
-            AminoAcid.Gln
-            AminoAcid.Arg
-            AminoAcid.Ser
-            AminoAcid.Thr
+            AminoAcid.Pro // P
+            AminoAcid.Gln // Q
+            AminoAcid.Arg // R
+            AminoAcid.Ser // S
+            AminoAcid.Thr // T
             //AminoAcid.Sel
-            AminoAcid.Val
-            AminoAcid.Trp
-            AminoAcid.Tyr
-   
-            AminoAcid.Xaa
-            AminoAcid.Asx
-            AminoAcid.Sel
-            AminoAcid.Glx
-       
+            AminoAcid.Val // V
+            AminoAcid.Trp // W
+            AminoAcid.Tyr // Y
+            AminoAcid.Xaa // X
+            AminoAcid.Asx // B
+            AminoAcid.Sel // U
+            AminoAcid.Glx // Z
         ]
 
     
@@ -159,6 +158,10 @@ module Prediction =
         yF, yP
     
     let bioSeqToInput (input: BioSeq.BioSeq<AminoAcids.AminoAcid>) :targetPOut[] = 
+        printfn "input conversion"
+        printfn "length before: %i" (input |> Seq.length)
+
+        let res = 
             input 
             |> Seq.choose (fun x -> 
                 try
@@ -174,10 +177,14 @@ module Prediction =
                 | _-> None
                 )
             |> Array.ofSeq
+        printfn "length after: %i" res.Length
+        res
     
     let predictFinal (modelBuffer:byte[]) (sequence:string) = 
         let bsequence = BioSeq.ofAminoAcidString sequence
-        let _, predictedTraces = predict modelBuffer (bioSeqToInput bsequence) 
+        printfn "predicting for %A" bsequence
+        printfn "length: %A" (bsequence |> Seq.length)
+        let _, predictedTraces = predict modelBuffer (bioSeqToInput bsequence)
         predictedTraces
 
     let predictIMTSLPropensityForSequence (modelBuffer:byte[]) (inputSequence: string) =

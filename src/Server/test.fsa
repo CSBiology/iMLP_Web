@@ -1,0 +1,16 @@
+>Should work (Contains all valid amino acids)
+ACDEFGHIKLMNPQRSTUVWYXZBACDEFGHIKLMNPQRSTUVWYXZBACDEFGHIKLMNPQRSTUVWYXZB
+>Should work, warning for Gap/Ter/O/J (Contains all amino acids)
+ACDEFGHIKL*MNPQRSTUVWYXZBA-CDEFGHIKLMNPQRSTUVWYXZBACDEFGHIKLMNPQRSTUVWYXZB*
+>Should work, warning for Gap/Ter/O/J (Contains all amino acids and gap/ter)
+ACDEFGHIKLMNOPQRSTUVWYXJZBACDEFGHIKLMNOPQRSTUVWYXJZBACDEFGHIKLMNOPQRSTUVWYXJZB*-
+>Should work, warning for Gap/Ter/O/J (Contains all amino acids and gap/ter)
+ACDEFGHIKLMNOPQRSTUVWYXJZBACDEFGHIKLMNOPQRSTUVWYXJZBACDEFGHIKLMNOPQRSTUVWYXJZB*-
+>Should work, warning for short sequence (<21)
+ACDEFGHIK
+>Should work, warning for short sequence after filtering (<21 after gap ter)
+A-CDE*FG-HIK*LMNOPQ*RST-U*
+>Should not work, error sequence is empty
+
+>Should not work, error sequence is empty after filtering gap ter
+***---

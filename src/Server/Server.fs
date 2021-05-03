@@ -6,6 +6,7 @@ open System.Net
 open Shared
 open TargetPServer
 open CNTKServer
+open InputSanitizing
 
 open Suave
 open Suave.Files
@@ -15,7 +16,7 @@ open Suave.Operators
 open Fable.Remoting.Server
 open Fable.Remoting.Suave
 
-
+open BioFSharp
 open BioFSharp.IO
 open FSharpAux
 open FSharpAux.IO
@@ -304,7 +305,7 @@ let iMLPResultsToCsv (res: seq<IMLPResult>) (id : System.Guid) =
         )
 
 
-let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
+let singleSequenceToMany (fsa:FastA.FastaItem<BioArray.BioArray<AminoAcids.AminoAcid>>) =
     let header = fsa.Header
     let sequence = fsa.Sequence
     let len = Seq.length fsa.Sequence
@@ -318,124 +319,165 @@ let singleSequenceToMany (fsa:FastA.FastaItem<seq<char>>) =
 
 let targetPApi = {
     SingleSequenceRequestLegacy = fun (model,single) -> async {
-        //read fasta item from input
-        let fastA =
-            if single.StartsWith(">") then
-                single
-                |> fun x -> x.Replace("\r\n","\n")
-                |> String.split '\n'
-                |> FastA.fromFileEnumerator id
-                |> Array.ofSeq
-            else
-                sprintf ">No Header Provided\n%s" single
-                |> fun x -> x.Replace("\r\n","\n")
-                |> String.split '\n'
-                |> FastA.fromFileEnumerator id
-                |> Array.ofSeq
+        try
+            let header, rawSequence =
+                extractHeaderAndSequence single
 
-        let header = fastA.[0].Header
+            let joinedRawSequence = rawSequence |> String.concat "" 
 
-        let targetModel = TargetP.NonPlant
+            let sanitizedInput =  sanitizeInputSequence joinedRawSequence
 
-        let client = Docker.connect "npipe://./pipe/docker_engine"
-        let tpContext = 
-                BioContainer.initBcContextWithMountAsync
-                    client
-                    (Docker.ImageId "targetp:1.1")
-                    (
-                        @"Server\tmp"
-                        |> Paths.deploymentSpecificPath
-                    )
-                |> Async.RunSynchronously
+            match sanitizedInput with
+            | EmptySequence | FilteredEmptySequence | InvalidCharacters _ | InternalServerError ->
 
-        //Save fasta to temporary container path
-        let splitSeqs =
-            fastA.[0]
-                |> fun x -> {x with Sequence = x.Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' ))}
-                |> singleSequenceToMany
+                return
+                    LegacyResult.create
+                        header
+                        joinedRawSequence
+                        [||]
+                        [||]
+                        [||]
+                        ""
+                        ""
+                        sanitizedInput
 
-        let paths =
-            splitSeqs
-            |> Seq.map
-                (fun _ ->
-                    System.Threading.Thread.Sleep 10
-                    sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
-                    |> Paths.deploymentSpecificPath
-                )
-            |> Array.ofSeq
+            | ShortSequence sanitized
+            | FilteredShortSequence sanitized
+            | ContainsGapTerOJ sanitized
+            | Success sanitized ->
+                //Success of stringread fasta item from input
+                let targetModel =
+                    match model with
+                    | Plant     -> TargetP.Plant
+                    | NonPlant  -> TargetP.NonPlant
+
+                let client = Docker.connect "npipe://./pipe/docker_engine"
+                let tpContext = 
+                        BioContainer.initBcContextWithMountAsync
+                            client
+                            (Docker.ImageId "targetp:1.1")
+                            (
+                                @"Server\tmp"
+                                |> Paths.deploymentSpecificPath
+                            )
+                        |> Async.RunSynchronously
+
+                //Save fasta to temporary container path
+
+                let splitSeqs = 
+                    FastA.createFastaItem
+                        header
+                        (BioArray.ofAminoAcidString sanitized)
+                    |> singleSequenceToMany
+
+                let paths =
+                    splitSeqs
+                    |> Seq.map
+                        (fun _ ->
+                            System.Threading.Thread.Sleep 10
+                            sprintf @"Server\tmp\%s.fsa" (System.Guid.NewGuid().ToString())
+                            |> Paths.deploymentSpecificPath
+                        )
+                    |> Array.ofSeq
                     
-        splitSeqs
-        |> Seq.iter2 (fun tmpPath tpreq -> FastA.write id tmpPath tpreq) paths
+                splitSeqs
+                |> Seq.iter2 (fun tmpPath tpreq -> FastA.write AminoAcids.symbol tmpPath tpreq) paths
 
-        //Run Biocontainer
-        let scores = 
-            paths
-            |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
-            |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
-            |> Seq.concat
-            |> Array.ofSeq
+                //Run Biocontainer
+                let scores = 
+                    paths
+                    |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
+                    |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
+                    |> Seq.concat
+                    |> Array.ofSeq
 
-        let smoothed = Propensity.smoothOnly 3 scores
+                let smoothed = Propensity.smoothOnly 3 scores
 
-        //Cleanup
-        //dispose running container
-        BioContainer.disposeAsync tpContext
-        |> Async.RunSynchronously
-        //delete temporary file
-        paths |> Array.iter File.Delete
+                //Cleanup
+                //dispose running container
+                BioContainer.disposeAsync tpContext
+                |> Async.RunSynchronously
+                //delete temporary file
+                paths |> Array.iter File.Delete
 
-        //return result
-        let scorePlot = PlotHelpers.plotRawTargetPScores "Raw TargetP Scores" scores
-        let propensity = Propensity.ofWindowed 3 scores
-        let propensityPlot = PlotHelpers.plotPropensity "iMTS-L propensity" propensity
+                //return result
+                let scorePlot = PlotHelpers.plotRawTargetPScores "Raw TargetP Scores" scores
+                let propensity = Propensity.ofWindowed 3 scores
+                let propensityPlot = PlotHelpers.plotPropensity "iMTS-L propensity" propensity
 
-        return {
-            Header                  =   header
-            Sequence                =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
-            RawTargetPScores        =   scores
-            SmoothedTargetPScores   =   smoothed
-            PropensityScores        =   propensity
-            PropensityPlotHtml      =   propensityPlot
-            ScorePlotHtml           =   scorePlot
-        }
+                return
+                    LegacyResult.create
+                        header
+                        sanitized
+                        scores
+                        smoothed
+                        propensity
+                        propensityPlot
+                        scorePlot
+                        sanitizedInput
+
+        with _ ->
+            return
+                LegacyResult.create
+                    ""
+                    ""
+                    [||]
+                    [||]
+                    [||]
+                    ""
+                    ""
+                    InternalServerError
     }
 
     SingleSequenceRequestIMLP =
         fun (model,single) -> async {
-            //read fasta item from input
-            let fastA =
-                if single.StartsWith(">") then
-                    single
-                    |> fun x -> x.Replace("\r\n","\n")
-                    |> String.split '\n'
-                    |> FastA.fromFileEnumerator id
-                    |> Array.ofSeq
-                else
-                    sprintf ">No Header Provided\n%s" single
-                    |> fun x -> x.Replace("\r\n","\n")
-                    |> String.split '\n'
-                    |> FastA.fromFileEnumerator id
-                    |> Array.ofSeq
-                     
-            let header = fastA.[0].Header
+            try 
+                let header, rawSequence =
+                    extractHeaderAndSequence single
 
-            let fastaString =
-                fastA
-                |> Seq.item 0
-                |> fun x -> x.Sequence
-                |> Array.ofSeq
-                |> String.fromCharArray
-                 
-            let imlpPropensity =
-                fastaString
-                |> CNTKServer.Prediction.predictIMTSLPropensityForSequence (CNTKServer.Models.getModelBuffer model)
+                let joinedRawSequence = rawSequence |> String.concat "" 
 
-            return {
-                Header              =   header
-                Sequence            =   new System.String (fastA.[0].Sequence |> Seq.filter (fun aa -> not (aa = '*' || aa = '-' )) |> Array.ofSeq)
-                PropensityScores    =   imlpPropensity
-                PropensityPlotHtml  =   PlotHelpers.plotPropensity "iMTS-L propensity" imlpPropensity
-            }
+                let sanitizedInput =  sanitizeInputSequence joinedRawSequence
+
+                match sanitizedInput with
+                | EmptySequence | FilteredEmptySequence | InvalidCharacters _ | InternalServerError ->
+                    return
+                        IMLPResult.create
+                            header
+                            joinedRawSequence
+                            [||]
+                            ""
+                            sanitizedInput
+
+                | ShortSequence sanitized
+                | FilteredShortSequence sanitized
+                | ContainsGapTerOJ sanitized
+                | Success sanitized ->
+
+                    printfn "sanitized input Length : %i" sanitized.Length
+
+                    let imlpPropensity =
+                        sanitized
+                        |> CNTKServer.Prediction.predictIMTSLPropensityForSequence (CNTKServer.Models.getModelBuffer model)
+
+                    printfn "propensitiy profile Length : %i" imlpPropensity.Length
+
+                    return
+                        IMLPResult.create
+                            header
+                            sanitized
+                            imlpPropensity
+                            (PlotHelpers.plotPropensity "iMTS-L propensity" imlpPropensity)
+                            sanitizedInput
+            with _ ->
+                return
+                    IMLPResult.create
+                        ""
+                        ""
+                        [||]
+                        ""
+                        InternalServerError
+
         }
 
     DownloadRequestSingleLegacy = fun (res,id) -> async {
