@@ -249,6 +249,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                                 ]
                                 li [Class "block"] [
                                     block [str "Interactive iMTS-L propensity score profile area plot"]
+                                    block [str "iMTS-L propensity scores above zero indicate iMTS-L stretches. In yeast current studies suggests a length of 12 – 20 amino acids that might vary between species, but further studies are needed to provide solid statistics about the stretch length."]
                                     block [str "These generated plots are fully interactive, meaning you can zoom, pinch, etc."]
                                     block [str "If you like these plots, you can download them by hovering over them and selecting the \"Download plot\" button (the camera image) "]
                                 ]
