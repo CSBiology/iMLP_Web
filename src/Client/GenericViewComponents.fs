@@ -229,7 +229,7 @@ let getDisplayHelpText (model:Model) (dispatch:Msg->unit) =
                             strong [] [str "for batch computations with more than 1000 sequences, please "]
                             a [OnClick (fun _ -> ChangeHelpDisplay (Contact) |> dispatch)] [str "contact us"]
                             strong [] [str " or use the "]
-                            a [Href ""] [str "standalone tool"]
+                            a [Href "https://github.com/CSBiology/iMLP/releases/"] [str "standalone tool"]
                         ]
                         block [ str "Provide input either via entering a single protein sequence in the textbox or by oploading a file pressing the file link below the textbox."]
                         block [ str "When provided a single sequence via the textbox, a single iMTS-L prediction report will pop in the Result section once the prediction is finished."]
