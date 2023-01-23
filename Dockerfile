@@ -36,9 +36,9 @@ RUN dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o .
 
 
 # Second build step
-FROM mcr.microsoft.com/dotnet/core/sdk:2.2
+FROM mcr.microsoft.com/dotnet/core/sdk:2.2 as dependencies
 
-COPY --from=build /workspace/deploy /app
+#COPY --from=build /workspace/deploy /app
 WORKDIR /usr/local
 
 RUN apt-get update -y \
@@ -53,12 +53,12 @@ RUN wget https://www.open-mpi.org/software/ompi/v1.10/downloads/openmpi-1.10.3.t
 
 WORKDIR /usr/local/openmpi-1.10.3
 
-RUN ./configure --prefix=/usr/local/mpi 
-RUN make -j all
-RUN make install
-
-ENV PATH=/usr/local/mpi/bin:$PATH
-ENV LD_LIBRARY_PATH=/usr/local/mpi/lib:$LD_LIBRARY_PATH
+#RUN ./configure --prefix=/usr/local/mpi 
+#RUN make -j all
+#RUN make install
+#
+#ENV PATH=/usr/local/mpi/bin:$PATH
+#ENV LD_LIBRARY_PATH=/usr/local/mpi/lib:$LD_LIBRARY_PATH
 
 # Add cntk libs
 WORKDIR /usr/local
@@ -68,6 +68,32 @@ RUN wget https://cntk.azurewebsites.net/BinaryDrop/CNTK-2-7-Linux-64bit-CPU-Only
     rm -f CNTK-2-7-Linux-64bit-CPU-Only.tar.gz
 
 RUN cp ./cntk/cntk/lib/Cntk.Core.CSBinding-2.7.so ./cntk/cntk/lib/libCntk.Core.CSBinding-2.7.dll
+
+#ENV PATH="/usr/local/cntk/cntk/lib:${PATH}"
+#ENV PATH="/usr/local/cntk/cntk/dependencies/lib:${PATH}"
+#ENV LD_LIBRARY_PATH="/usr/local/cntk/cntk/lib:${LD_LIBRARY_PATH}"
+#ENV LD_LIBRARY_PATH="/usr/local/cntk/cntk/dependencies/lib:${LD_LIBRARY_PATH}"
+
+
+# Trying to minimiz image size
+FROM mcr.microsoft.com/dotnet/core/sdk:2.2
+
+COPY --from=build /workspace/deploy /app
+COPY --from=dependencies /usr/local/openmpi-1.10.3 /usr/local/openmpi-1.10.3
+COPY --from=dependencies /usr/local/cntk /usr/local/cntk
+
+RUN apt-get update -y \
+    && apt-get install -y g++ \
+    && apt-get install make
+
+WORKDIR /usr/local/openmpi-1.10.3
+
+RUN ./configure --prefix=/usr/local/mpi 
+RUN make -j all
+RUN make install
+
+ENV PATH=/usr/local/mpi/bin:$PATH
+ENV LD_LIBRARY_PATH=/usr/local/mpi/lib:$LD_LIBRARY_PATH
 
 ENV PATH="/usr/local/cntk/cntk/lib:${PATH}"
 ENV PATH="/usr/local/cntk/cntk/dependencies/lib:${PATH}"
