@@ -70,6 +70,8 @@ type IMLPResult =
 
 type ITargetPApi = {
 
+    getVersion: unit -> Async<string>
+
     // Legacy model
     SingleSequenceRequestLegacy : OrganismModel*string -> Async<LegacyResult>
     DownloadRequestSingleLegacy: LegacyResult*System.Guid -> Async<unit>

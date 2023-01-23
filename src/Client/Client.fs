@@ -119,7 +119,7 @@ open ResultViews
 //    ]
 
 let view (model : Model) (dispatch : Msg -> unit) =
-    div [][
+    div [] [
         navbar model dispatch
         errorModal true model dispatch
         eulaModal model dispatch

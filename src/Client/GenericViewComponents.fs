@@ -497,7 +497,7 @@ let hero (model : Model) (dispatch : Msg -> unit) =
                             TextDecoration "none"
                             Color "white"
                         ]
-                        ][
+                        ] [
                             str "'Details'"
                     ]
                     str " section." 

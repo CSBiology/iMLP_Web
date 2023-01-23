@@ -1,4 +1,7 @@
 {
+    "scripts": {
+        "build": "webpack-cli -p"
+    },
     "private": true,
     "devDependencies": {
         "@babel/core": "^7.4.4",

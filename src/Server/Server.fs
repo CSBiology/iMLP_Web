@@ -31,10 +31,11 @@ module Config =
     type DeployMode =
     |Local
     |Server
+    |Docker
 
 
     let deployConfig =
-        DeployMode.Local
+        DeployMode.Docker
 
 module Paths =
 
@@ -56,6 +57,10 @@ module Paths =
         match deployConfig with
         |Local -> getLocalPath
         |Server -> getAbsoluteServerPath
+        |Docker -> fun p -> Path.Combine("",p)
+
+/// ensure directory is created
+let _ = Directory.CreateDirectory (Paths.deploymentSpecificPath "Client/public/CsvResults")
 
 module Propensity =
     open FSharp.Stats
@@ -318,6 +323,8 @@ let singleSequenceToMany (fsa:FastA.FastaItem<BioArray.BioArray<AminoAcids.Amino
 
 
 let targetPApi = {
+    getVersion = fun () -> async { return "0.0.1" }
+
     SingleSequenceRequestLegacy = fun (model,single) -> async {
         try
             let header, rawSequence =
@@ -469,11 +476,11 @@ let targetPApi = {
                             imlpPropensity
                             (PlotHelpers.plotPropensity "iMTS-L propensity" imlpPropensity)
                             sanitizedInput
-            with _ ->
+            with e ->
                 return
                     IMLPResult.create
-                        ""
-                        ""
+                        e.Message
+                        (e.ToString())
                         [||]
                         ""
                         InternalServerError
