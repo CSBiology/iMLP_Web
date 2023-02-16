@@ -4,6 +4,8 @@ SAFE application serving a webservice that runs [iMLP](https://github.com/CSBiol
 
 ## Run locally
 
+#### Follow all prerequisites laid out [here](https://github.com/CSBiology/iMLP#general) to make the backend work
+
 You need .NET 6 + runtime/SDK
 
 - `dotnet tool restore`
