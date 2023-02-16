@@ -1,30 +1,31 @@
+module Server
+
+open Fable.Remoting.Server
+open Fable.Remoting.Giraffe
+open Saturn
+
+open Shared
+
 open System.IO
 open System
 open System.Reflection
 open System.Net
 
 open Shared
-open TargetPServer
 open CNTKServer
 open InputSanitizing
 
-open Suave
-open Suave.Files
-open Suave.Filters
-open Suave.Operators
-
-open Fable.Remoting.Server
-open Fable.Remoting.Suave
-
 open BioFSharp
 open BioFSharp.IO
-open FSharpAux
-open FSharpAux.IO
-open FSharp.Plotly
-
 open BioFSharp.BioContainers
 open FSharpAux
-open Suave.Logging
+open FSharpAux.IO
+
+open Plotly.NET
+open Plotly.NET.LayoutObjects
+open Plotly.NET.TraceObjects
+open Plotly.NET.ConfigObjects
+
 
 module Config =
 
@@ -66,7 +67,7 @@ module Propensity =
     open FSharp.Stats
 
     let n = 3 // !!!
-    
+
     let ofWindowed n (source:float[]) =
 
         if n < 0 then invalidArg "n" "n must be a positive integer"
@@ -87,7 +88,7 @@ module Propensity =
             source
             |> FSharp.Stats.Signal.Filtering.savitzky_golay (if source.Length < 21 then 3 else 21) 1 0 0
             |> Seq.toArray
-    
+
         Array.init source.Length
             (fun i ->
                 match i with
@@ -114,7 +115,7 @@ module Propensity =
             source
             |> FSharp.Stats.Signal.Filtering.savitzky_golay (if source.Length < 21 then 3 else 21) 1 0 0
             |> Seq.toArray
-    
+
         Array.init source.Length
             (fun i ->
                 match i with
@@ -141,63 +142,68 @@ module PlotHelpers =
         )
 
     let xAxis title (zeroline : bool)=
-        Axis.LinearAxis.init
+        LinearAxis.init
             (
-                Title=title,
-                Showgrid=false,
-                Showline=true,
+                Title=Title.init(title),
+                ShowGrid=false,
+                ShowLine=true,
                 Mirror=StyleParam.Mirror.All,
-                Zeroline=zeroline,
-                Tickmode=StyleParam.TickMode.Auto,
+                ZeroLine=zeroline,
+                TickMode=StyleParam.TickMode.Auto,
                 Ticks= StyleParam.TickOptions.Inside,
-                Tickfont=Font.init(StyleParam.FontFamily.Arial,Size=18),
-                Titlefont=Font.init(StyleParam.FontFamily.Arial,Size=18)
+                TickFont=Font.init(StyleParam.FontFamily.Arial,Size=18)
             )
 
     let yAxis title =
-        Axis.LinearAxis.init
+        LinearAxis.init
             (
-                Title=title,
-                Showgrid=false,
-                Showline=true,
+                Title=Title.init(title),
+                ShowGrid=false,
+                ShowLine=true,
                 Mirror=StyleParam.Mirror.All,
-                Tickmode=StyleParam.TickMode.Auto,
+                TickMode=StyleParam.TickMode.Auto,
                 Ticks= StyleParam.TickOptions.Inside,
-                Tickfont=Font.init(StyleParam.FontFamily.Arial,Size=18.),
-                Titlefont=Font.init(StyleParam.FontFamily.Arial,Size=18.)
+                TickFont=Font.init(StyleParam.FontFamily.Arial,Size=18.)
             )
 
     let insideLegend () =
         Legend.init(
-            fun l ->
-                l?x <- 0.02
-                l?y <- 0.98
-                l?traceorder <- "normal"
-                l?bgcolor <- "rgba(222, 235, 247, 0.6)"
-                l?bordercolor <- "rgb(68, 84, 106)"
-                l?borderwidth <- "2"
-                l
+            X = 0.02,
+            Y = 0.98,
+            TraceOrder = StyleParam.TraceOrder.Normal,
+            BGColor = Color.fromString "rgba(222, 235, 247, 0.6)",
+            BorderColor = Color.fromString"rgb(68, 84, 106)",
+            BorderWidth = 2
         )
 
     let layout = fun () ->
-        let la = 
-            Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white")
-        la?legend <- insideLegend ()
-        la
+        Layout.init(
+            PaperBGColor= Color.fromString "rgba(0,0,0,0)",
+            PlotBGColor = Color.fromString "white",
+            Legend = insideLegend()
+        )
 
-    let csbDarkBlue = FSharpAux.Colors.fromRgb 68 84 106
+    let csbDarkBlue = Color.fromRGB 68 84 106
 
-    let csbOrange = FSharpAux.Colors.fromRgb 237 125 49
+    let csbOrange = Color.fromRGB 237 125 49
 
     let plotPropensity (name:string) (propensityScores: float array) =
 
         let vals = propensityScores |> Array.mapi (fun i x -> (i+1,x))
 
-        Chart.SplineArea(vals,Color = "rgb(237, 125, 49, 0.9)",Name = "Propensity Score",Width = 2.5)
-        |> Chart.withY_Axis(xAxis "Score" true)
-        |> Chart.withX_Axis(yAxis "Index of AminoAcid")
+        Chart.SplineArea(
+            vals,
+            LineColor = Color.fromString "rgb(237, 125, 49, 0.9)",
+            LineWidth = 2.5,
+            Name = "Propensity Score"
+        )
+        |> Chart.withYAxis(xAxis "Score" true)
+        |> Chart.withXAxis(yAxis "Index of AminoAcid")
         |> Chart.withTitle(sprintf "%s" name)
-        |> Chart.withLayout(Layout.init(Paper_bgcolor="rgba(0,0,0,0)",Plot_bgcolor="white"))
+        |> Chart.withLayoutStyle(
+            PaperBGColor= Color.fromString "rgba(0,0,0,0)",
+            PlotBGColor = Color.fromString "white"
+        )
         |> Chart.withSize(600.,600.)
         |> Chart.withConfig config
         |> GenericChart.toEmbeddedHTML
@@ -208,16 +214,25 @@ module PlotHelpers =
 
         let smoothed =
             Propensity.smoothOnly 3 rawScores
-            |> Array.mapi (fun i x -> (i+1,x)) 
+            |> Array.mapi (fun i x -> (i+1,x))
         [
-            Chart.Spline(smoothed,Color = FSharpAux.Colors.toWebColor csbOrange,Name = "smoothed",Width = 2.5)
-            Chart.Column(vals,Color = "rgba(68, 84, 106, 0.85)",Name = "raw TargetP score")
-            
+            Chart.Spline(
+                smoothed,
+                LineColor = csbOrange,
+                LineWidth = 2.5,
+                Name = "smoothed"
+            )
+            Chart.Column(
+                vals,
+                MarkerColor = Color.fromString "rgba(68, 84, 106, 0.85)",
+                Name = "raw TargetP score"
+            )
+
         ]
-        |> Chart.Combine
-        |> Chart.withY_Axis(xAxis "Score" false)
-        |> Chart.withY_AxisStyle("Score",MinMax=(0.,1.2))
-        |> Chart.withX_Axis(yAxis "Index of AminoAcid")
+        |> Chart.combine
+        |> Chart.withYAxis(xAxis "Score" false)
+        |> Chart.withYAxisStyle("Score",MinMax=(0.,1.2))
+        |> Chart.withXAxis(yAxis "Index of AminoAcid")
         |> Chart.withTitle(sprintf "%s" name)
         |> Chart.withLayout (layout ())
         |> Chart.withSize(600.,600.)
@@ -225,6 +240,7 @@ module PlotHelpers =
         |> GenericChart.toEmbeddedHTML
 
 module ServerPath =
+
     let workingDirectory =
         let currentAsm = Assembly.GetExecutingAssembly()
         let codeBaseLoc = currentAsm.CodeBase
@@ -239,37 +255,15 @@ let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" 
 let publicPath = ServerPath.resolve [".."; "Client"; "public"]
 let port = tryGetEnv "HTTP_PLATFORM_PORT" |> Option.map System.UInt16.Parse |> Option.defaultValue 8085us
 
-let deleteTempFiles () = 
+let deleteTempFiles () =
     let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
     for f in (System.IO.DirectoryInfo(path).GetFiles())
         do if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then File.Delete(f.FullName)
 
-let loggingOptions =
-  { Literate.LiterateOptions.create() with
-      getLogLevelText = function Verbose->"V" | Debug->"D" | Info->"I" | Warn->"W" | Error->"E" | Fatal->"F" }
-
-let logger = LiterateConsoleTarget(
-                name = [|"Suave";"Examples";"Example"|],
-                minLevel = Verbose,
-                options = loggingOptions,
-                outputTemplate = "[{level}] {timestampUtc:o} {message} [{source}]{exceptions}"
-              ) :> Logger
-
-
-let config =
-    { defaultConfig with
-        homeFolder = Some publicPath
-        bindings = [ HttpBinding.create HTTP (IPAddress.Parse "0.0.0.0") port ] 
-        maxContentLength = 1000000000
-        SuaveConfig.listenTimeout = new System.TimeSpan(0,0,5,0)
-        logger = logger
-        SuaveConfig.bufferSize = 1048576
-        }
-
 let rand = new System.Random()
 
 let legacyResultsToCsv (res: seq<LegacyResult>) (id : System.Guid) =
-    let str = 
+    let str =
         [
             yield ("Header","Sequence","Raw_TargetP_Scores","iMTS-L_Propensity_Scores")
             for r in res do
@@ -290,7 +284,7 @@ let legacyResultsToCsv (res: seq<LegacyResult>) (id : System.Guid) =
         )
 
 let iMLPResultsToCsv (res: seq<IMLPResult>) (id : System.Guid) =
-    let str = 
+    let str =
         [
             yield ("Header","Sequence","iMTS-L_Propensity_Scores")
             for r in res do
@@ -316,7 +310,7 @@ let singleSequenceToMany (fsa:FastA.FastaItem<BioArray.BioArray<AminoAcids.Amino
     let len = Seq.length fsa.Sequence
     [for i = 0 to len-1 do
         yield
-            FastA.createFastaItem (sprintf ">%s" header) (Seq.skip i sequence) 
+            FastA.createFastaItem (sprintf ">%s" header) (Seq.skip i sequence)
             ]
     //targetP fails on Sequences longer than 1200 amino acids, so be safe and split sequences in 1000 item sized chunks
     |> Seq.chunkBySize 1000
@@ -330,7 +324,7 @@ let targetPApi = {
             let header, rawSequence =
                 extractHeaderAndSequence single
 
-            let joinedRawSequence = rawSequence |> String.concat "" 
+            let joinedRawSequence = rawSequence |> String.concat ""
 
             let sanitizedInput =  sanitizeInputSequence joinedRawSequence
 
@@ -359,7 +353,7 @@ let targetPApi = {
                     | NonPlant  -> TargetP.NonPlant
 
                 let client = Docker.connect "npipe://./pipe/docker_engine"
-                let tpContext = 
+                let tpContext =
                         BioContainer.initBcContextWithMountAsync
                             client
                             (Docker.ImageId "targetp:1.1")
@@ -371,7 +365,7 @@ let targetPApi = {
 
                 //Save fasta to temporary container path
 
-                let splitSeqs = 
+                let splitSeqs =
                     FastA.createFastaItem
                         header
                         (BioArray.ofAminoAcidString sanitized)
@@ -386,12 +380,12 @@ let targetPApi = {
                             |> Paths.deploymentSpecificPath
                         )
                     |> Array.ofSeq
-                    
+
                 splitSeqs
                 |> Seq.iter2 (fun tmpPath tpreq -> FastA.write AminoAcids.symbol tmpPath tpreq) paths
 
                 //Run Biocontainer
-                let scores = 
+                let scores =
                     paths
                     |> Array.map (fun tmpPath -> TargetPServer.runWithMount tpContext targetModel tmpPath)
                     |> Array.map (fun (tpres) -> tpres |>  Seq.map (fun x -> x.Mtp))
@@ -438,11 +432,11 @@ let targetPApi = {
 
     SingleSequenceRequestIMLP =
         fun (model,single) -> async {
-            try 
+            try
                 let header, rawSequence =
                     extractHeaderAndSequence single
 
-                let joinedRawSequence = rawSequence |> String.concat "" 
+                let joinedRawSequence = rawSequence |> String.concat ""
 
                 let sanitizedInput =  sanitizeInputSequence joinedRawSequence
 
@@ -493,7 +487,7 @@ let targetPApi = {
         return ()
     }
 
-    DownloadRequestSingleIMLP = fun (res,id) -> async { 
+    DownloadRequestSingleIMLP = fun (res,id) -> async {
         deleteTempFiles()
         iMLPResultsToCsv [res] id
         return ()
@@ -516,29 +510,30 @@ open System
 
 type CustomError = { errorMsg: string }
 
-let errorHandler (ex: Exception) (routeInfo: RouteInfo<HttpContext>) : ErrorResult = 
+let errorHandler (ex: Exception) (routeInfo: RouteInfo<_>) : ErrorResult =
     // do some logging
     printfn "Error at %s on method %s" routeInfo.path routeInfo.methodName
     // decide whether or not you want to propagate the error to the client
     match ex with
     | _ ->  Propagate ex
 
-let webApi =
+let webApp =
     Remoting.createApi()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.withDiagnosticsLogger (fun x -> if x.Length < 10000 then printfn "%s" x else (printfn "omitting some of the serialized result [length is above 10000 characters]...\r\n%s" x.[0..10000]))
     |> Remoting.withErrorHandler errorHandler
     |> Remoting.fromValue targetPApi
-    |> Remoting.buildWebPart
+    |> Remoting.buildHttpHandler
 
-let webApp =
-    choose [
-        webApi
-        path "/" >=> browseFileHome "index.html"
-        //pathScan "/api/csvresults/%s" (fun fileName -> file (ServerPath.resolve ["..";"..";"client";"public";fileName]))
-        browseHome
-        RequestErrors.NOT_FOUND "Not found!"
-    ]
+let app =
+    application {
+        use_router webApp
+        memory_cache
+        use_static "public"
+        use_gzip
+    }
 
-startWebServer config webApp
-
+[<EntryPoint>]
+let main _ =
+    run app
+    0

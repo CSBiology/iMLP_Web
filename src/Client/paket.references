@@ -1,13 +1,12 @@
-group Client
-    FSharp.Core
-    Fable.Core
-    Fable.Browser.Blob
-    Fable.Browser.Dom
-    Fable.Browser.Event
-    Fable.Elmish.Debugger
-    Fable.Elmish.React
-    Fable.Elmish.HMR
-    Fable.Remoting.Client
-    Fulma
-    Fable.FontAwesome.Free
-    Feliz.Plotly
+Fable.Core
+Fable.Elmish
+Fable.Elmish.React
+Fable.Elmish.Debugger
+Fable.Elmish.HMR
+Fable.React
+Fable.FontAwesome.Free
+Fable.Remoting.Client
+Feliz
+Feliz.Bulma
+Fsharp.Core
+Fulma

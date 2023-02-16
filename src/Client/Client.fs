@@ -11,7 +11,6 @@ open Fulma
 open Fable.React
 open Browser.Dom
 open Browser.Types
-open Fable.FontAwesome
 
 open Shared
 

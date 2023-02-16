@@ -1,12 +1,11 @@
-group Server
-    FSharp.Core
-    Suave
-    Fable.Remoting.Suave
-    BioFSharp
-    BioFSharp.IO
-    BioFSharp.BioContainers
-    FSharpAux
-    FSharpAux.IO
-    FSharp.Plotly
-    FSharp.Stats
-    CNTK.CPUOnly
+Saturn
+Fable.Remoting.Giraffe
+Fsharp.Core
+BioFSharp
+BioFSharp.IO
+BioFSharp.BioContainers
+FSharpAux
+FSharpAux.IO
+Plotly.NET
+FSharp.Stats
+CNTK.CPUOnly
