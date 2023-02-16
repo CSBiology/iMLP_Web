@@ -1,14 +1,17 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <Platforms>x64</Platforms>
         <TargetFramework>net6.0</TargetFramework>
         <DefineConstants>FABLE_COMPILER</DefineConstants>
     </PropertyGroup>
     <ItemGroup>
+        <None Include="style.scss" />
         <Compile Include="AppModel.fs" />
         <Compile Include="StateHandling.fs" />
         <Compile Include="JSInterop.fs" />
         <Compile Include="GenericViewComponents.fs" />
+        <Compile Include="PlotComponent.fs" />
         <Compile Include="ResultViews.fs" />
         <Compile Include="Client.fs" />
         <None Include="index.html" />

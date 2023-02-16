@@ -433,20 +433,22 @@ module CompositeViews =
                             res.PropensityScores
                         hr []
                         Heading.h4 [] [str (if model.PlotMode = PlotMode.Propensity || model.SelectedComputationMode = ComputationMode.IMLP then "Predicted iMTS-L propensity profile:" else "Predicted raw TargetP scores:")]
-                        iframe [
-                            Props.SrcDoc (res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>"))
-                            Props.Class "ResultFrame"
-                            Props.Scrolling "no"]
-                            [
-                                p [] [
-                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                                ]
-                        ]
-                        hr[]
+                        PlotComponent.plotIMLPResult res
+                        //iframe [
+                        //    Props.SrcDoc (res.PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") )
+                        //    Props.Class "ResultFrame"
+                        //    Props.Style [Width 600; Height 600]
+                        //    Props.Scrolling "no"]
+                        //    [
+                        //        p [] [
+                        //            str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                        //        ]
+                        //]
+                        hr []
                         Heading.h4 [] [str "RunInfo"]
                         parseStateMessage res.ParseState
                         Heading.h4 [] [str "Download your results"]
-                        hr[]
+                        hr []
                         downloadView model dispatch
                     | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
                         br []
@@ -487,20 +489,21 @@ module CompositeViews =
                             res.[index].PropensityScores
                         hr []
                         Heading.h4 [] [str "Predicted iMTS-L propensity profile:"]
-                        iframe [
-                            Props.SrcDoc (res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") )
-                            Props.Class "ResultFrame"
-                            Props.Scrolling "no"]
-                            [
-                                p [] [
-                                    str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
-                                ]
-                        ]
-                        hr[]
+                        PlotComponent.plotIMLPResult res.[index]
+                        //iframe [
+                        //    Props.SrcDoc (res.[index].PropensityPlotHtml.Replace("</head>","<style>.js-plotly-plot{width: 50% !important;margin: auto !important;}</style></head>") )
+                        //    Props.Class "ResultFrame"
+                        //    Props.Scrolling "no"]
+                        //    [
+                        //        p [] [
+                        //            str "Your browser does not support the srcDoc attribute of iframes. See https://caniuse.com/#search=iframe for Browser version that support iframes."
+                        //        ]
+                        //]
+                        hr []
                         Heading.h4 [] [str "RunInfo"]
                         parseStateMessage currentRes.ParseState
                         Heading.h4 [] [str "Download your results"]
-                        hr[]
+                        hr []
                         downloadView model dispatch
                     | InvalidCharacters _ | FilteredEmptySequence | EmptySequence | InternalServerError ->
                         br []
