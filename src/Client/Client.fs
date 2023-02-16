@@ -11,7 +11,6 @@ open Fulma
 open Fable.React
 open Browser.Dom
 open Browser.Types
-open Fable.FontAwesome
 
 open Shared
 
@@ -146,7 +145,7 @@ Program.mkProgram init update view
 #if DEBUG
 |> Program.withConsoleTrace
 #endif
-|> Program.withReactBatched "elmish-app"
+|> Program.withReactSynchronous "elmish-app"
 #if DEBUG
 |> Program.withDebugger
 #endif

@@ -7,11 +7,10 @@ open Fable.React.Props
 open Fable.Core.JsInterop
 open Shared
 open Fulma
-//open Fulma.FontAwesome
+open Fable.FontAwesome
 open Fable.React
 open Browser.Dom
 open Browser.Types
-open Fable.FontAwesome
 
 open Shared
 open JSInterop
@@ -352,7 +351,7 @@ let modeSelection (model : Model) (dispatch : Msg -> unit) =
             ] []
     | _ ->
         File.file [File.IsBoxed;File.IsFullWidth;File.HasName] [
-            File.label [] [
+            File.Label.label [] [
                 singleFileInput [
                     Props.Hidden true
                     OnTextReceived(fun x -> FastaUploadInput (x.Data,x.Name) |> dispatch)

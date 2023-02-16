@@ -1,42 +1,24 @@
-FROM mcr.microsoft.com/dotnet/core/sdk:2.2 as build
+FROM mcr.microsoft.com/dotnet/sdk:6.0 as build
+# Developer
+LABEL author Kevin Frey <freymaurer@gmx.de>
+LABEL author Kevin Schneider <schneike@bio.uni-kl.de>
 
-# Add keys and sources lists
-RUN curl -sL https://deb.nodesource.com/setup_11.x | bash
-RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -
-RUN echo "deb https://dl.yarnpkg.com/debian/ stable main" \
-    | tee /etc/apt/sources.list.d/yarn.list
-
-# Install node, 7zip, yarn, git, process tools
-RUN apt-get update && apt-get install -y nodejs p7zip-full git procps
+# Install node
+# node_18 will not work because some lazyView2 function from fable is not supported anymore. (see console)
+RUN curl -sL https://deb.nodesource.com/setup_16.x | bash
+RUN apt-get update && apt-get install -y nodejs
 
 WORKDIR /workspace
-
-COPY . .
-
-# Install fake
-RUN dotnet tool install fake-cli -g --version 5.20.3
-
-# Install Paket
-RUN dotnet tool install paket -g --version 5.257.0
-
-# add dotnet tools to path to pick up fake and paket installation
-ENV PATH="/root/.dotnet/tools:${PATH}"
-
+COPY ../. .
+RUN dotnet tool restore
 RUN npm install
-RUN paket restore
-RUN mkdir -p ./deploy/Client/public
-RUN mkdir -p ./deploy/Server
-
-RUN dotnet restore ./src/Client
-RUN npm run build
-RUN cp -r src/Client/deploy/* ./deploy/Client/public
-
-RUN dotnet build src/Server/Server.fsproj
-RUN dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o ../../deploy/Server src/Server/Server.fsproj
-
+RUN dotnet fable src/Client -o src/Client/output -e .fs.js -s --run webpack --mode production
+#RUN cd src/Server && dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o ../../deploy
+RUN cd src/Server && dotnet publish -c Release -o ../../deploy
+# RUN dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o ../../deploy/Server src/Server/Server.fsproj
 
 # Second build step
-FROM mcr.microsoft.com/dotnet/core/sdk:2.2 as dependencies
+FROM mcr.microsoft.com/dotnet/sdk:6.0 as dependencies
 
 #COPY --from=build /workspace/deploy /app
 WORKDIR /usr/local
@@ -75,8 +57,8 @@ RUN cp ./cntk/cntk/lib/Cntk.Core.CSBinding-2.7.so ./cntk/cntk/lib/libCntk.Core.C
 #ENV LD_LIBRARY_PATH="/usr/local/cntk/cntk/dependencies/lib:${LD_LIBRARY_PATH}"
 
 
-# Trying to minimiz image size
-FROM mcr.microsoft.com/dotnet/core/sdk:2.2
+# Trying to minimize image size
+FROM mcr.microsoft.com/dotnet/sdk:6.0
 
 COPY --from=build /workspace/deploy /app
 COPY --from=dependencies /usr/local/openmpi-1.10.3 /usr/local/openmpi-1.10.3
@@ -101,5 +83,5 @@ ENV LD_LIBRARY_PATH="/usr/local/cntk/cntk/lib:${LD_LIBRARY_PATH}"
 ENV LD_LIBRARY_PATH="/usr/local/cntk/cntk/dependencies/lib:${LD_LIBRARY_PATH}"
 
 WORKDIR /app
-EXPOSE 8085
-ENTRYPOINT [ "dotnet", "Server/Server.dll" ]
+EXPOSE 5000
+ENTRYPOINT [ "dotnet", "Server.dll" ]
