@@ -2,6 +2,7 @@ open Fake.Core
 open Fake.IO
 open Farmer
 open Farmer.Builders
+open Fake.IO.Globbing.Operators
 
 open Helpers
 
@@ -16,6 +17,11 @@ let serverTestsPath = Path.getFullName "tests/Server"
 let clientTestsPath = Path.getFullName "tests/Client"
 
 Target.create "Clean" (fun _ ->
+    !! "src/**/bin"
+    ++ "src/**/obj"
+    ++ "tests/**/bin"
+    ++ "tests/**/obj"
+    |> Shell.cleanDirs 
     Shell.cleanDir deployPath
     run dotnet "fable clean --yes" clientPath // Delete *.fs.js files created by Fable
 )

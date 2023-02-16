@@ -14,7 +14,7 @@ RUN dotnet tool restore
 RUN npm install
 RUN dotnet fable src/Client -o src/Client/output -e .fs.js -s --run webpack --mode production
 #RUN cd src/Server && dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o ../../deploy
-RUN cd src/Server && dotnet publish --self-contained --runtime linux-x64 -c Release -o ../../deploy
+RUN cd src/Server && dotnet publish -c Release -o ../../deploy
 # RUN dotnet publish --self-contained --runtime linux-x64 --configuration x64 -o ../../deploy/Server src/Server/Server.fsproj
 
 # Second build step

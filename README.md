@@ -15,6 +15,7 @@ You need .NET 6 + runtime/SDK
 
 - change `DeployMode` to `Docker` (in Server.fs)
 - increase SemVer version in package.json.
+- `dotnet run bundle` (don't ask why. you need this. no it does not make too much sense.)
 - `docker build -t imlp-web .` (Will take some time because of dependency download)
 - `docker run -it -p 5000:5000 imlp-web` (for testing)
 - `docker tag imlp-web:latest csbdocker/imlp-web:latest`
