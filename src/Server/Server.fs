@@ -43,7 +43,7 @@ module Paths =
     open Config
 
     [<Literal>]
-    let local = @"C:\Users\schne\source\repos\kMutagene\TargetPService\src"
+    let local = @"C:\Users\schne\source\repos\CSBiology\iMLP_Web\src"
 
     [<Literal>]
     let server = @"C:\SafeApps\TargetPService\deploy"
@@ -61,7 +61,7 @@ module Paths =
         |Docker -> fun p -> Path.Combine("",p)
 
 /// ensure directory is created
-let _ = Directory.CreateDirectory (Paths.deploymentSpecificPath "Client/public/CsvResults")
+let _ = Directory.CreateDirectory (Paths.deploymentSpecificPath "./public/CsvResults")
 
 module Propensity =
     open FSharp.Stats
@@ -239,24 +239,9 @@ module PlotHelpers =
         |> Chart.withConfig config
         |> GenericChart.toEmbeddedHTML
 
-module ServerPath =
-
-    let workingDirectory =
-        let currentAsm = Assembly.GetExecutingAssembly()
-        let codeBaseLoc = currentAsm.CodeBase
-        let localPath = Uri(codeBaseLoc).LocalPath
-        Directory.GetParent(localPath).FullName
-
-    let resolve segments =
-        let paths = Array.concat [| [| workingDirectory |]; Array.ofList segments |]
-        Path.GetFullPath(Path.Combine(paths))
-
-let tryGetEnv = System.Environment.GetEnvironmentVariable >> function null | "" -> None | x -> Some x
-let publicPath = ServerPath.resolve [".."; "Client"; "public"]
-let port = tryGetEnv "HTTP_PLATFORM_PORT" |> Option.map System.UInt16.Parse |> Option.defaultValue 8085us
 
 let deleteTempFiles () =
-    let path = Paths.deploymentSpecificPath @"Client/public/CsvResults"
+    let path = Paths.deploymentSpecificPath @"public/CsvResults"
     for f in (System.IO.DirectoryInfo(path).GetFiles())
         do if (System.DateTime.Now.Subtract( f.CreationTime)).Minutes > 1 then File.Delete(f.FullName)
 
@@ -279,7 +264,7 @@ let legacyResultsToCsv (res: seq<LegacyResult>) (id : System.Guid) =
     str
     |> Seq.write
         (
-            sprintf @"Client/public/CsvResults/%s.txt" (id.ToString())
+            sprintf @"public/CsvResults/%s.txt" (id.ToString())
             |> Paths.deploymentSpecificPath
         )
 
@@ -299,7 +284,7 @@ let iMLPResultsToCsv (res: seq<IMLPResult>) (id : System.Guid) =
     str
     |> Seq.write
         (
-            sprintf @"Client/public/CsvResults/%s.txt" (id.ToString())
+            sprintf @"public/CsvResults/%s.txt" (id.ToString())
             |> Paths.deploymentSpecificPath
         )
 
